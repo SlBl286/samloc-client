@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="vi" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sâm Lốc Online - Flat & Minimalist Card Game</title>
+  </head>
+  <body class="h-full relative overflow-hidden bg-[#0d0d11] text-gray-200 antialiased select-none">
+    
+    <!-- PixiJS WebGL canvas underlay -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HTML Game UI Overlay -->
+    <div id="ui-layer" class="absolute inset-0 z-10 flex flex-col justify-between p-6 pointer-events-none md:p-8">
+      
+      <!-- Top Bar: Logo & Server status / Authentication -->
+      <header class="flex items-center justify-between w-full pointer-events-auto">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center font-bold text-lg text-white">S</div>
+          <div>
+            <h1 class="text-lg font-bold tracking-wider text-white">SÂM LỐC</h1>
+            <p class="text-[10px] text-pink-500 font-semibold tracking-widest uppercase">Lobby Engine</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <!-- Server Status -->
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs backdrop-blur-md">
+            <span id="ws-status-indicator" class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span id="ws-status-text" class="text-gray-300 font-medium text-[11px]">Checking Server...</span>
+          </div>
+
+          <!-- User Widget (Logged-in details) -->
+          <div id="user-profile-widget" class="hidden flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] backdrop-blur-md">
+            <span class="text-gray-400">Chào, <strong id="username-display" class="text-pink-500 font-semibold">Player</strong></span>
+            <span class="w-[1px] h-3 bg-white/10"></span>
+            <button id="btn-logout" class="text-gray-400 hover:text-white cursor-pointer transition-colors font-medium">Đăng xuất</button>
+          </div>
+
+          <!-- Trigger Login Button -->
+          <button id="btn-show-login" class="px-4 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer transition-all">
+            Đăng nhập
+          </button>
+        </div>
+      </header>
+
+    <!-- HTML Game UI Overlay -->
+    <div id="ui-layer" class="absolute inset-0 z-10 flex flex-col justify-between p-6 pointer-events-none md:p-8">
+      
+      <!-- LOBBY VIEW -->
+      <div id="lobby-view" class="w-full h-full flex flex-col justify-between pointer-events-none">
+        <!-- Top Bar: Logo & Server status / Authentication -->
+        <header class="flex items-center justify-between w-full pointer-events-auto">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center font-bold text-lg text-white">S</div>
+            <div>
+              <h1 class="text-lg font-bold tracking-wider text-white">SÂM LỐC</h1>
+              <p class="text-[10px] text-pink-500 font-semibold tracking-widest uppercase">Lobby Engine</p>
+            </div>
+          </div>
+          
+          <div class="flex items-center gap-3">
+            <!-- Fullscreen Button -->
+            <button id="btn-fullscreen-lobby" class="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5 pointer-events-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />
+              </svg>
+              <span class="hidden sm:inline">Phóng To</span>
+            </button>
+
+            <!-- User Widget (Logged-in details) -->
+            <div id="user-profile-widget" class="hidden flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] backdrop-blur-md">
+              <span class="text-gray-400">Chào, <strong id="username-display" class="text-pink-500 font-semibold">Player</strong></span>
+              <span class="w-[1px] h-3 bg-white/10"></span>
+              <button id="btn-logout" class="text-gray-400 hover:text-white cursor-pointer transition-colors font-medium">Đăng xuất</button>
+            </div>
+
+            <!-- Trigger Login Button -->
+            <button id="btn-show-login" class="px-4 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer transition-all">
+              Đăng nhập
+            </button>
+          </div>
+        </header>
+
+        <!-- Main Center Area: Title & Actions -->
+        <main class="max-w-4xl mx-auto w-full flex flex-col items-center justify-center text-center gap-6 py-8">
+          <div class="space-y-3 pointer-events-auto">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-600/10 border border-pink-600/20 text-[10px] text-pink-500 font-semibold uppercase tracking-wider">
+              ⚡ Powered by PixiJS + GSAP + Rust
+            </div>
+            <h2 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
+              Sâm Lốc Online
+            </h2>
+            <p class="text-gray-400 max-w-md mx-auto text-xs md:text-sm leading-relaxed">
+              Trải nghiệm game bài Sâm Lốc đỉnh cao với đồ họa WebGL phẳng, hiệu ứng GSAP tối giản và backend Rust Axum/WebSockets siêu tốc.
+            </p>
+          </div>
+
+          <!-- Action Cards/Buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl mt-2 pointer-events-auto">
+            
+            <div id="btn-quick-play" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+              <div class="w-10 h-10 rounded-lg bg-pink-600/10 flex items-center justify-center text-pink-500 group-hover:bg-pink-600 group-hover:text-white transition-all duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-sm">Chơi Ngay</h3>
+                <p class="text-[10px] text-gray-500 mt-0.5">Vào bàn chơi nhanh ngẫu nhiên</p>
+              </div>
+            </div>
+
+            <div id="btn-create-room" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+              <div class="w-10 h-10 rounded-lg bg-violet-600/10 flex items-center justify-center text-violet-500 group-hover:bg-violet-600 group-hover:text-white transition-all duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-sm">Tạo Bàn</h3>
+                <p class="text-[10px] text-gray-500 mt-0.5">Cược, số người & đặt mật khẩu</p>
+              </div>
+            </div>
+
+            <div id="btn-draw-card" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group sm:col-span-2 md:col-span-1">
+              <div class="w-10 h-10 rounded-lg bg-amber-600/10 flex items-center justify-center text-amber-500 group-hover:bg-amber-600 group-hover:text-white transition-all duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-sm">Xáo & Chia Bài</h3>
+                <p class="text-[10px] text-gray-500 mt-0.5">Trình diễn hiệu ứng GSAP phẳng</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Room List Container -->
+          <div id="lobby-rooms-container" class="w-full max-w-2xl mt-4 pointer-events-auto text-left">
+            <div class="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+              <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> Bàn Chơi Trực Tuyến
+              </h3>
+              <button id="btn-refresh-rooms" class="text-[11px] text-pink-500 hover:text-pink-400 transition-colors font-semibold cursor-pointer">
+                Làm mới
+              </button>
+            </div>
+            <div id="lobby-rooms-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[160px] overflow-y-auto pr-1">
+              <!-- Dynamically populated -->
+              <p class="text-xs text-gray-500 italic py-2 col-span-2 text-center">Không tìm thấy phòng chơi nào. Hãy tạo bàn chơi mới!</p>
+            </div>
+          </div>
+        </main>
+
+        <!-- Bottom Bar: Player list and stats -->
+        <footer class="w-full flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-auto border-t border-white/5 pt-4">
+          <div class="text-[11px] text-gray-600">
+            &copy; 2026 Sâm Lốc Online. All rights reserved.
+          </div>
+          
+          <div class="flex items-center gap-4 text-[11px] text-gray-500">
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span id="active-rooms-count">0 Bàn Đang Chơi</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Online</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      <!-- GAME VIEW (ROOM STAGE) -->
+      <div id="game-view" class="w-full h-full flex flex-col justify-between pointer-events-none hidden">
+        <!-- Game Top Bar -->
+        <header class="flex items-center justify-between w-full pointer-events-auto">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center font-bold text-lg text-white">S</div>
+            <div>
+              <h2 id="game-room-name" class="text-sm font-bold text-white tracking-wider">Phòng #000</h2>
+              <p id="game-room-info" class="text-[10px] text-gray-400 font-semibold tracking-wider">Mức cược: 1,000 Gold</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <!-- Fullscreen Button -->
+            <button id="btn-fullscreen-game" class="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5 pointer-events-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />
+              </svg>
+            </button>
+
+            <!-- Game Status / Round Info -->
+            <div id="game-status-label" class="px-3 py-1.5 rounded-lg bg-pink-600/10 border border-pink-600/20 text-[10px] text-pink-500 font-semibold uppercase tracking-widest hidden">
+              Có người báo Sâm!
+            </div>
+
+            <!-- Leave Room Button -->
+            <button id="btn-leave-room" class="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-rose-950/30 border border-white/10 hover:border-rose-900/50 text-gray-300 hover:text-rose-400 text-xs font-semibold cursor-pointer transition-all">
+              Rời Bàn
+            </button>
+          </div>
+        </header>
+
+        <!-- Game Controls at the bottom -->
+        <div class="w-full max-w-xl mx-auto flex flex-col items-center gap-3 pb-32 pointer-events-auto">
+          <!-- Turn instruction info/status -->
+          <div id="game-turn-tip" class="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-[11px] text-gray-300 backdrop-blur-md">
+            Đang chờ người chơi sẵn sàng...
+          </div>
+
+          <!-- Buttons Panel -->
+          <div class="flex items-center justify-center gap-3 w-full">
+            <!-- Ready Action -->
+            <button id="btn-ready" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer">
+              Sẵn Sàng
+            </button>
+
+            <!-- Announce Sam Action -->
+            <button id="btn-announce-sam" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer hidden">
+              Báo Sâm
+            </button>
+
+            <!-- Play Cards Action -->
+            <button id="btn-play-cards" class="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer hidden">
+              Đánh Bài
+            </button>
+
+            <!-- Pass Action -->
+            <button id="btn-pass" class="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold text-xs tracking-wider uppercase transition-all cursor-pointer hidden">
+              Bỏ Lượt
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Auth Modal Overlay -->
+    <div id="auth-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-[#050508]/75 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+      <div class="glass-panel w-full max-w-sm p-6 rounded-xl border border-white/10 scale-95 transition-all duration-300 transform" id="auth-card">
+        
+        <!-- Header Tabs -->
+        <div class="flex items-center border-b border-white/10 pb-3 mb-4">
+          <button id="tab-login" class="flex-1 text-center font-bold text-base text-white pb-2 border-b-2 border-pink-600 focus:outline-none cursor-pointer">Đăng nhập</button>
+          <button id="tab-register" class="flex-1 text-center font-bold text-base text-gray-400 pb-2 border-b-2 border-transparent hover:text-white focus:outline-none cursor-pointer">Đăng ký</button>
+        </div>
+
+        <!-- Feedback message -->
+        <div id="auth-error" class="hidden text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 text-xs mb-4 text-center"></div>
+
+        <!-- Form fields -->
+        <form id="auth-form" class="space-y-4" onsubmit="return false;">
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Tên tài khoản</label>
+            <input id="input-username" type="text" autocomplete="username" placeholder="Nhập username..." required
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Mật khẩu</label>
+            <input id="input-password" type="password" autocomplete="current-password" placeholder="Nhập password..." required
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+          
+          <button id="btn-submit-auth" class="w-full py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer">
+            Đăng nhập
+          </button>
+        </form>
+
+        <span class="flex items-center justify-center gap-2 my-4 text-[10px] text-gray-600">
+          <span class="h-[1px] flex-1 bg-white/5"></span> hoặc <span class="h-[1px] flex-1 bg-white/5"></span>
+        </span>
+
+        <button id="btn-bypass-auth" class="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-lg text-[11px] font-semibold transition-all cursor-pointer">
+          Chơi Offline (Sandbox)
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Create Room Modal Overlay -->
+    <div id="create-room-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-[#050508]/75 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+      <div class="glass-panel w-full max-w-sm p-6 rounded-xl border border-white/10 scale-95 transition-all duration-300 transform" id="create-room-card">
+        <h3 class="text-base font-bold text-white mb-4">Tạo Bàn Chơi</h3>
+        <div id="create-room-error" class="hidden text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 text-xs mb-4 text-center"></div>
+        
+        <form id="create-room-form" class="space-y-4" onsubmit="return false;">
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Tên phòng</label>
+            <input id="create-room-name" type="text" placeholder="Nhập tên phòng..." required
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Mức cược (Gold)</label>
+            <input id="create-room-bet" type="number" min="100" step="100" value="1000" required
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Số người tối đa</label>
+              <select id="create-room-max-players" class="w-full px-3 py-2 bg-[#121217] border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all cursor-pointer">
+                <option value="2">2 người</option>
+                <option value="3">3 người</option>
+                <option value="4" selected>4 người</option>
+                <option value="5">5 người</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Mật khẩu</label>
+              <input id="create-room-password" type="text" placeholder="Bỏ trống"
+                     class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button id="btn-cancel-create-room" type="button" class="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-lg text-xs font-semibold transition-all cursor-pointer">
+              Hủy
+            </button>
+            <button id="btn-submit-create-room" type="submit" class="flex-1 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer">
+              Tạo phòng
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Reusable Custom Dialog Modal -->
+    <div id="custom-dialog-container" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+      <div class="glass-panel w-full max-w-sm p-6 rounded-xl border border-white/10 scale-95 transition-all duration-300 transform" id="custom-dialog-card">
+        <h3 id="custom-dialog-title" class="text-base font-bold text-white mb-2">Thông báo</h3>
+        <p id="custom-dialog-message" class="text-xs text-gray-400 leading-relaxed mb-4">Nội dung thông báo...</p>
+        
+        <!-- Target for prompt inputs if any -->
+        <div id="custom-dialog-input-wrapper" class="mb-4 hidden">
+          <input id="custom-dialog-input" type="text" class="w-full px-3 py-2 bg-white/5 border border-white/15 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+        </div>
+
+        <div id="custom-dialog-buttons" class="flex items-center justify-end gap-2.5">
+          <button id="custom-dialog-btn-cancel" class="px-3.5 py-1.5 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 text-gray-300 text-xs font-semibold transition-all cursor-pointer">Hủy</button>
+          <button id="custom-dialog-btn-ok" class="px-4 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold transition-all cursor-pointer">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main JS Application script -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
