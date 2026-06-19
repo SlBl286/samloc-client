@@ -14,40 +14,6 @@
     <!-- HTML Game UI Overlay -->
     <div id="ui-layer" class="absolute inset-0 z-10 flex flex-col justify-between p-6 pointer-events-none md:p-8">
       
-      <!-- Top Bar: Logo & Server status / Authentication -->
-      <header class="flex items-center justify-between w-full pointer-events-auto">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center font-bold text-lg text-white">S</div>
-          <div>
-            <h1 class="text-lg font-bold tracking-wider text-white">SÂM LỐC</h1>
-            <p class="text-[10px] text-pink-500 font-semibold tracking-widest uppercase">Lobby Engine</p>
-          </div>
-        </div>
-        
-        <div class="flex items-center gap-3">
-          <!-- Server Status -->
-          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs backdrop-blur-md">
-            <span id="ws-status-indicator" class="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span id="ws-status-text" class="text-gray-300 font-medium text-[11px]">Checking Server...</span>
-          </div>
-
-          <!-- User Widget (Logged-in details) -->
-          <div id="user-profile-widget" class="hidden flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] backdrop-blur-md">
-            <span class="text-gray-400">Chào, <strong id="username-display" class="text-pink-500 font-semibold">Player</strong></span>
-            <span class="w-[1px] h-3 bg-white/10"></span>
-            <button id="btn-logout" class="text-gray-400 hover:text-white cursor-pointer transition-colors font-medium">Đăng xuất</button>
-          </div>
-
-          <!-- Trigger Login Button -->
-          <button id="btn-show-login" class="px-4 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer transition-all">
-            Đăng nhập
-          </button>
-        </div>
-      </header>
-
-    <!-- HTML Game UI Overlay -->
-    <div id="ui-layer" class="absolute inset-0 z-10 flex flex-col justify-between p-6 pointer-events-none md:p-8">
-      
       <!-- LOBBY VIEW -->
       <div id="lobby-view" class="w-full h-full flex flex-col justify-between pointer-events-none">
         <!-- Top Bar: Logo & Server status / Authentication -->
@@ -55,8 +21,7 @@
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center font-bold text-lg text-white">S</div>
             <div>
-              <h1 class="text-lg font-bold tracking-wider text-white">SÂM LỐC</h1>
-              <p class="text-[10px] text-pink-500 font-semibold tracking-widest uppercase">Lobby Engine</p>
+              <h1 class="text-lg font-bold tracking-wider text-white">Sâm Lốc</h1>
             </div>
           </div>
           
