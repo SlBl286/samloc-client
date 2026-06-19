@@ -32,6 +32,18 @@ export class GameCanvas {
   private lastCardCounts: Record<number, number> = {};
   private lastPassedPlayers: number[] = [];
   private lastSelfId: number = 0;
+  private lastSpectators: number[] = [];
+  private lastTurnLimitSeconds: number = 15;
+
+  // Cached center pile state to re-render on resize
+  private lastPlayedCards: number[] = [];
+  private lastPlayedById: number | null = null;
+
+  // Turn timer visuals
+  private turnTimerGraphic!: Graphics;
+  private turnTimerActivePlayerId: number | null = null;
+  private turnTimerRemaining: number = 0;
+  private turnTimerDuration: number = 0;
 
   private suits = [
     { char: '♠', name: 'spades', color: '#2563eb' }, // Clean blue spades
@@ -61,6 +73,9 @@ export class GameCanvas {
     this.tableGraphic = new Graphics();
     this.app.stage.addChild(this.tableGraphic);
 
+    this.turnTimerGraphic = new Graphics();
+    this.app.stage.addChild(this.turnTimerGraphic);
+
     this.deckContainer = new Container();
     this.app.stage.addChild(this.deckContainer);
 
@@ -76,6 +91,20 @@ export class GameCanvas {
     this.resizeTable();
     window.addEventListener('resize', () => this.resizeTable());
     this.createBackgroundParticles();
+
+    this.app.ticker.add((ticker) => {
+      if (this.turnTimerActivePlayerId !== null && this.turnTimerRemaining > 0) {
+        const elapsedSecs = ticker.elapsedMS / 1000;
+        this.turnTimerRemaining -= elapsedSecs;
+        if (this.turnTimerRemaining <= 0) {
+          this.turnTimerRemaining = 0;
+          this.turnTimerActivePlayerId = null;
+          this.turnTimerGraphic.clear();
+        } else {
+          this.drawTurnCountdownRing();
+        }
+      }
+    });
   }
 
   // Get dynamic card layout constraints based on screen size
@@ -109,6 +138,11 @@ export class GameCanvas {
   }
 
   private resizeTable() {
+    if (!this.app || !this.app.renderer) return;
+
+    // Force renderer to sync size with window inner dimension immediately
+    this.app.renderer.resize(window.innerWidth, window.innerHeight);
+
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     const dims = this.getCardDimensions();
@@ -128,7 +162,10 @@ export class GameCanvas {
     this.pileContainer.position.set(w / 2, h / 2 - 50);
     
     if (this.cardContainer) {
-      this.cardContainer.position.set(w / 2, h - dims.offsetY);
+      const spotX = w < 768 ? 45 : 90;
+      const leftBoundary = spotX + dims.avatarRadius + (w < 768 ? 10 : 20);
+      const cardCenterX = (w + leftBoundary) / 2;
+      this.cardContainer.position.set(cardCenterX, h - dims.offsetY);
       
       // Scale and fan cards in real-time
       const scale = dims.width / 80;
@@ -152,8 +189,15 @@ export class GameCanvas {
         this.lastActivePlayerId,
         this.lastCardCounts,
         this.lastPassedPlayers,
-        this.lastSelfId
+        this.lastSelfId,
+        this.lastTurnLimitSeconds,
+        this.lastSpectators
       );
+    }
+
+    // Refresh center pile cards
+    if (this.lastPlayedCards.length > 0) {
+      this.setLastPlayed(this.lastPlayedCards, this.lastPlayedById, false);
     }
   }
 
@@ -424,7 +468,9 @@ export class GameCanvas {
     activePlayerId: number | null,
     cardCounts: Record<number, number>,
     passedPlayers: number[],
-    selfId: number
+    selfId: number,
+    turnLimitSeconds = 15,
+    spectators: number[] = []
   ) {
     // Cache inputs first
     this.lastRoomPlayers = players;
@@ -433,6 +479,21 @@ export class GameCanvas {
     this.lastCardCounts = cardCounts;
     this.lastPassedPlayers = passedPlayers;
     this.lastSelfId = selfId;
+    this.lastTurnLimitSeconds = turnLimitSeconds;
+    this.lastSpectators = spectators;
+
+    // Handle timer initialization when active player changes
+    if (activePlayerId === null) {
+      this.turnTimerActivePlayerId = null;
+      this.turnTimerRemaining = 0;
+      if (this.turnTimerGraphic) {
+        this.turnTimerGraphic.clear();
+      }
+    } else if (this.turnTimerActivePlayerId !== activePlayerId) {
+      this.turnTimerActivePlayerId = activePlayerId;
+      this.turnTimerRemaining = turnLimitSeconds;
+      this.turnTimerDuration = turnLimitSeconds;
+    }
 
     this.playerContainer.removeChildren();
     this.playerSpots.clear();
@@ -453,9 +514,14 @@ export class GameCanvas {
       
       const angle = Math.PI / 2 + (relativeIdx * 2 * Math.PI) / players.length;
 
-      const spotX = w / 2 + Math.cos(angle) * radius;
-      // Extra bottom offset for self to leave room for visual hand
-      const spotY = h / 2 + Math.sin(angle) * radius + (relativeIdx === 0 ? (w < 768 ? 15 : 25) : 0);
+      let spotX = w / 2 + Math.cos(angle) * radius;
+      let spotY = h / 2 + Math.sin(angle) * radius;
+
+      if (relativeIdx === 0) {
+        // Shift bottom-self player spot to the bottom-left corner so it doesn't get covered by hand cards
+        spotX = w < 768 ? 45 : 90;
+        spotY = h - (w < 768 ? 55 : 85);
+      }
 
       const spotContainer = new Container();
       spotContainer.position.set(spotX, spotY);
@@ -514,8 +580,12 @@ export class GameCanvas {
 
       const isReady = readyPlayers.includes(userId);
       const isPassed = passedPlayers.includes(userId);
+      const isSpectator = spectators.includes(userId);
 
-      if (isPassed) {
+      if (isSpectator) {
+        statusStr = 'XEM CHƠI';
+        statusColor = 0xa8a29e; // Stone / light gray
+      } else if (isPassed) {
         statusStr = 'PASS';
         statusColor = 0xef4444; // Red
       } else if (isReady) {
@@ -567,6 +637,9 @@ export class GameCanvas {
 
   // Display played card combination in the center pile
   public setLastPlayed(playedCards: number[], playedById: number | null, animate = true) {
+    this.lastPlayedCards = playedCards;
+    this.lastPlayedById = playedById;
+
     this.pileContainer.removeChildren();
 
     if (playedCards.length === 0) return;
@@ -666,10 +739,62 @@ export class GameCanvas {
   }
 
   // Clear the table for a new game or round
-  public clearTable() {
+  public clearTable(clearPlayers = true) {
     this.pileContainer.removeChildren();
     this.cards.forEach(c => this.cardContainer.removeChild(c.container));
     this.cards = [];
+    this.lastPlayedCards = [];
+    this.lastPlayedById = null;
+    this.turnTimerActivePlayerId = null;
+    this.turnTimerRemaining = 0;
+    if (this.turnTimerGraphic) {
+      this.turnTimerGraphic.clear();
+    }
+
+    if (clearPlayers) {
+      this.playerContainer.removeChildren();
+      this.playerSpots.clear();
+      this.lastRoomPlayers = [];
+      this.lastReadyPlayers = [];
+      this.lastActivePlayerId = null;
+      this.lastCardCounts = {};
+      this.lastPassedPlayers = [];
+      this.lastSelfId = 0;
+      this.lastSpectators = [];
+      this.lastTurnLimitSeconds = 15;
+    }
+  }
+
+  // Remove specified cards from hand and realign
+  public removeCardsFromHand(cardValues: number[]) {
+    // 1. Remove PIXI containers of played cards
+    this.cards.forEach(card => {
+      if (cardValues.includes(card.value)) {
+        this.cardContainer.removeChild(card.container);
+      }
+    });
+
+    // 2. Filter out played cards from this.cards array
+    this.cards = this.cards.filter(card => !cardValues.includes(card.value));
+
+    // 3. Realign remaining cards fanned out
+    const dims = this.getCardDimensions();
+    const totalWidth = dims.spacing * (this.cards.length - 1);
+    const startX = -totalWidth / 2;
+
+    this.cards.forEach((card, index) => {
+      const targetX = startX + index * dims.spacing;
+      const targetY = card.isSelected ? -32 * (dims.width / 80) : 0;
+      
+      // Smoothly animate the fanned out remaining cards into their new slots
+      gsap.to(card.container, {
+        x: targetX,
+        y: targetY,
+        rotation: (index - (this.cards.length - 1) / 2) * 0.04,
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    });
   }
 
   // Temporary speech bubble notification for in-game statuses
@@ -745,5 +870,35 @@ export class GameCanvas {
       }
     }
     this.setHand(mockVals, true);
+  }
+
+  // Draw radial progress timer ring around active player's spot
+  private drawTurnCountdownRing() {
+    if (!this.turnTimerGraphic) return;
+    this.turnTimerGraphic.clear();
+
+    if (this.turnTimerActivePlayerId === null || this.turnTimerRemaining <= 0) {
+      return;
+    }
+
+    const spot = this.playerSpots.get(this.turnTimerActivePlayerId);
+    if (!spot) return;
+
+    const dims = this.getCardDimensions();
+    const radius = dims.avatarRadius + 4;
+    const progress = this.turnTimerRemaining / this.turnTimerDuration; // 1.0 down to 0.0
+
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + progress * 2 * Math.PI;
+
+    let color = 0x10b981; // Green
+    if (progress < 0.2) {
+      color = 0xef4444; // Red
+    } else if (progress < 0.5) {
+      color = 0xf59e0b; // Amber
+    }
+
+    this.turnTimerGraphic.arc(spot.x, spot.y, radius, startAngle, endAngle);
+    this.turnTimerGraphic.stroke({ width: 3, color });
   }
 }

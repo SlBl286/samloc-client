@@ -49,75 +49,100 @@
         </header>
 
         <!-- Main Center Area: Title & Actions -->
-        <main class="max-w-4xl mx-auto w-full flex flex-col items-center justify-center text-center gap-6 py-8">
-          <div class="space-y-3 pointer-events-auto">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-600/10 border border-pink-600/20 text-[10px] text-pink-500 font-semibold uppercase tracking-wider">
-              ⚡ Powered by PixiJS + GSAP + Rust
+        <main class="max-w-4xl mx-auto w-full flex-1 flex flex-col items-center justify-center text-center py-4 md:py-6 overflow-hidden">
+          
+          <!-- Main Lobby Panel (Hero + Menu) -->
+          <div id="lobby-main-panel" class="w-full flex flex-col items-center justify-center gap-6 pointer-events-auto">
+            <div class="space-y-3">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-600/10 border border-pink-600/20 text-[10px] text-pink-500 font-semibold uppercase tracking-wider">
+                ⚡ Powered by PixiJS + GSAP + Rust
+              </div>
+              <h2 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
+                Sâm Lốc Online
+              </h2>
+              <p class="text-gray-400 max-w-md mx-auto text-xs md:text-sm leading-relaxed">
+                Trải nghiệm game bài Sâm Lốc đỉnh cao với đồ họa WebGL phẳng, hiệu ứng GSAP tối giản và backend Rust Axum/WebSockets siêu tốc.
+              </p>
             </div>
-            <h2 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
-              Sâm Lốc Online
-            </h2>
-            <p class="text-gray-400 max-w-md mx-auto text-xs md:text-sm leading-relaxed">
-              Trải nghiệm game bài Sâm Lốc đỉnh cao với đồ họa WebGL phẳng, hiệu ứng GSAP tối giản và backend Rust Axum/WebSockets siêu tốc.
-            </p>
+
+            <!-- Action Cards/Buttons -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full max-w-3xl mt-2">
+              
+              <div id="btn-quick-play" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+                <div class="w-10 h-10 rounded-lg bg-pink-600/10 flex items-center justify-center text-pink-500 group-hover:bg-pink-600 group-hover:text-white transition-all duration-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white text-sm">Chơi Ngay</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Vào bàn nhanh ngẫu nhiên</p>
+                </div>
+              </div>
+
+              <div id="btn-create-room" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+                <div class="w-10 h-10 rounded-lg bg-violet-600/10 flex items-center justify-center text-violet-500 group-hover:bg-violet-600 group-hover:text-white transition-all duration-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white text-sm">Tạo Bàn</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Cược & đặt mật khẩu riêng</p>
+                </div>
+              </div>
+
+              <div id="btn-browse-rooms" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+                <div class="w-10 h-10 rounded-lg bg-pink-600/10 flex items-center justify-center text-pink-500 group-hover:bg-pink-600 group-hover:text-white transition-all duration-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-3.75 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white text-sm">Danh Sách Bàn</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Tìm và duyệt phòng chơi</p>
+                </div>
+              </div>
+
+              <div id="btn-join-code" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
+                <div class="w-10 h-10 rounded-lg bg-emerald-600/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white text-sm">Vào Bằng Mã</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Nhập mã phòng vào chơi ngay</p>
+                </div>
+              </div>
+
+            </div>
           </div>
 
-          <!-- Action Cards/Buttons -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl mt-2 pointer-events-auto">
-            
-            <div id="btn-quick-play" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
-              <div class="w-10 h-10 rounded-lg bg-pink-600/10 flex items-center justify-center text-pink-500 group-hover:bg-pink-600 group-hover:text-white transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+          <!-- Rooms Panel (Dedicated Screen) -->
+          <div id="lobby-rooms-panel" class="w-full max-w-3xl flex flex-col text-left hidden h-full overflow-hidden pointer-events-auto">
+            <!-- Header of room panel -->
+            <div class="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
+              <button id="btn-back-to-menu" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold cursor-pointer transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                 </svg>
-              </div>
-              <div>
-                <h3 class="font-bold text-white text-sm">Chơi Ngay</h3>
-                <p class="text-[10px] text-gray-500 mt-0.5">Vào bàn chơi nhanh ngẫu nhiên</p>
-              </div>
-            </div>
-
-            <div id="btn-create-room" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
-              <div class="w-10 h-10 rounded-lg bg-violet-600/10 flex items-center justify-center text-violet-500 group-hover:bg-violet-600 group-hover:text-white transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </div>
-              <div>
-                <h3 class="font-bold text-white text-sm">Tạo Bàn</h3>
-                <p class="text-[10px] text-gray-500 mt-0.5">Cược, số người & đặt mật khẩu</p>
-              </div>
-            </div>
-
-            <div id="btn-join-code" class="glass-card p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2.5 text-center group">
-              <div class="w-10 h-10 rounded-lg bg-emerald-600/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                </svg>
-              </div>
-              <div>
-                <h3 class="font-bold text-white text-sm">Tham Gia Bàn</h3>
-                <p class="text-[10px] text-gray-500 mt-0.5">Nhập mã phòng để vào chơi nhanh</p>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Room List Container -->
-          <div id="lobby-rooms-container" class="w-full max-w-2xl mt-4 pointer-events-auto text-left">
-            <div class="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                Quay Lại
+              </button>
               <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> Bàn Chơi Trực Tuyến
+                <span class="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span> Bàn Chơi Trực Tuyến
               </h3>
-              <button id="btn-refresh-rooms" class="text-[11px] text-pink-500 hover:text-pink-400 transition-colors font-semibold cursor-pointer">
+              <button id="btn-refresh-rooms" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-600/10 hover:bg-pink-600/20 border border-pink-500/20 text-pink-500 hover:text-pink-400 text-xs font-semibold cursor-pointer transition-all">
                 Làm mới
               </button>
             </div>
-            <div id="lobby-rooms-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[160px] overflow-y-auto pr-1">
+            <!-- Scrollable List -->
+            <div id="lobby-rooms-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto flex-1 pr-1 pb-4 min-h-0">
               <!-- Dynamically populated -->
               <p class="text-xs text-gray-500 italic py-2 col-span-2 text-center">Không tìm thấy phòng chơi nào. Hãy tạo bàn chơi mới!</p>
             </div>
           </div>
+
         </main>
 
         <!-- Bottom Bar: Player list and stats -->
@@ -172,14 +197,14 @@
         </header>
 
         <!-- Game Controls at the bottom -->
-        <div class="w-full max-w-xl mx-auto flex flex-col items-center gap-3 pb-32 pointer-events-auto">
+        <div class="w-full max-w-xl mx-auto flex flex-col items-center gap-3 pb-32 pointer-events-none">
           <!-- Turn instruction info/status -->
-          <div id="game-turn-tip" class="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-[11px] text-gray-300 backdrop-blur-md">
+          <div id="game-turn-tip" class="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-[11px] text-gray-300 backdrop-blur-md pointer-events-auto">
             Đang chờ người chơi sẵn sàng...
           </div>
 
           <!-- Buttons Panel -->
-          <div class="flex items-center justify-center gap-3 w-full">
+          <div class="flex items-center justify-center gap-3 w-full pointer-events-auto">
             <!-- Ready Action -->
             <button id="btn-ready" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer">
               Sẵn Sàng
@@ -275,10 +300,19 @@
               </select>
             </div>
             <div>
-              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Mật khẩu</label>
-              <input id="create-room-password" type="text" placeholder="Bỏ trống"
-                     class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Thời gian lượt</label>
+              <select id="create-room-turn-limit" class="w-full px-3 py-2 bg-[#121217] border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all cursor-pointer">
+                <option value="10">10 giây</option>
+                <option value="15" selected>15 giây</option>
+                <option value="20">20 giây</option>
+                <option value="30">30 giây</option>
+              </select>
             </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Mật khẩu</label>
+            <input id="create-room-password" type="text" placeholder="Bỏ trống"
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
           </div>
 
           <div class="flex items-center gap-3 pt-2">

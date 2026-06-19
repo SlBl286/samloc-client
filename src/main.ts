@@ -15,6 +15,12 @@ class AppController {
   private lobbyView: HTMLElement;
   private gameView: HTMLElement;
 
+  // New panels for Room List separation
+  private lobbyMainPanel: HTMLElement;
+  private lobbyRoomsPanel: HTMLElement;
+  private btnBrowseRooms: HTMLButtonElement;
+  private btnBackToMenu: HTMLButtonElement;
+
   // Lobby elements
   private lobbyRoomsList: HTMLElement;
   private btnRefreshRooms: HTMLButtonElement;
@@ -29,6 +35,7 @@ class AppController {
   private inputRoomBet: HTMLInputElement;
   private selectRoomMaxPlayers: HTMLSelectElement;
   private inputRoomPassword: HTMLInputElement;
+  private selectRoomTurnLimit: HTMLSelectElement;
   private btnCancelCreateRoom: HTMLButtonElement;
   private btnSubmitCreateRoom: HTMLButtonElement;
 
@@ -49,6 +56,8 @@ class AppController {
   private isServerOnline: boolean = false;
   private currentRoomId: number | null = null;
   private currentUserId: number = 0;
+  private currentRoomTurnLimit: number = 15;
+  private currentRoomBet: number = 1000;
   private currentUsername: string = '';
   private isSelfReady: boolean = false;
   private currentRoomPlayers: number[] = [];
@@ -58,6 +67,12 @@ class AppController {
     // 1. Initialize Screen Views
     this.lobbyView = document.getElementById('lobby-view')!;
     this.gameView = document.getElementById('game-view')!;
+
+    // Initialize New Panels & Buttons
+    this.lobbyMainPanel = document.getElementById('lobby-main-panel')!;
+    this.lobbyRoomsPanel = document.getElementById('lobby-rooms-panel')!;
+    this.btnBrowseRooms = document.getElementById('btn-browse-rooms') as HTMLButtonElement;
+    this.btnBackToMenu = document.getElementById('btn-back-to-menu') as HTMLButtonElement;
 
     // 2. Initialize Lobby components
     this.lobbyRoomsList = document.getElementById('lobby-rooms-list')!;
@@ -74,6 +89,7 @@ class AppController {
     this.inputRoomBet = document.getElementById('create-room-bet') as HTMLInputElement;
     this.selectRoomMaxPlayers = document.getElementById('create-room-max-players') as HTMLSelectElement;
     this.inputRoomPassword = document.getElementById('create-room-password') as HTMLInputElement;
+    this.selectRoomTurnLimit = document.getElementById('create-room-turn-limit') as HTMLSelectElement;
     this.btnCancelCreateRoom = document.getElementById('btn-cancel-create-room') as HTMLButtonElement;
     this.btnSubmitCreateRoom = document.getElementById('btn-submit-create-room') as HTMLButtonElement;
 
@@ -112,6 +128,27 @@ class AppController {
     const btnQuickPlay = document.getElementById('btn-quick-play');
     const btnCreateRoom = document.getElementById('btn-create-room');
     const btnJoinCode = document.getElementById('btn-join-code');
+
+    if (this.btnBrowseRooms) {
+      this.btnBrowseRooms.addEventListener('click', () => {
+        this.lobbyMainPanel.classList.add('hidden');
+        this.lobbyRoomsPanel.classList.remove('hidden');
+        // Refresh room list immediately on open
+        if (this.isServerOnline) {
+          this.wsClient.sendMessage({
+            type: 'Connected',
+            user_id: this.currentUserId
+          });
+        }
+      });
+    }
+
+    if (this.btnBackToMenu) {
+      this.btnBackToMenu.addEventListener('click', () => {
+        this.lobbyRoomsPanel.classList.add('hidden');
+        this.lobbyMainPanel.classList.remove('hidden');
+      });
+    }
 
     if (btnJoinCode) {
       btnJoinCode.addEventListener('click', async () => {
@@ -162,6 +199,7 @@ class AppController {
         this.inputRoomName.value = `Bàn của ${username}`;
         this.inputRoomBet.value = '1000';
         this.selectRoomMaxPlayers.value = '4';
+        this.selectRoomTurnLimit.value = '15';
         this.inputRoomPassword.value = '';
         this.showCreateRoomModal();
       });
@@ -317,7 +355,7 @@ class AppController {
 
       case 'GameStarted':
         // Set player hand cards with fan dealing animation
-        this.canvasEngine.clearTable();
+        this.canvasEngine.clearTable(false);
         this.canvasEngine.setHand(msg.hand, true);
         
         this.btnReady.classList.add('hidden');
@@ -346,6 +384,13 @@ class AppController {
         break;
 
       case 'Error':
+        // Suppress placeholder success/processed notification alerts from the server
+        if (msg.message && (
+          msg.message.endsWith('processed') || 
+          msg.message.includes('processed')
+        )) {
+          break;
+        }
         dialog.show('Thông báo từ Server', msg.message, 'alert');
         break;
 
@@ -362,6 +407,14 @@ class AppController {
 
     this.gameView.classList.add('hidden');
     this.lobbyView.classList.remove('hidden');
+    
+    // Reset back to main panel, hide rooms panel
+    if (this.lobbyMainPanel) {
+      this.lobbyMainPanel.classList.remove('hidden');
+    }
+    if (this.lobbyRoomsPanel) {
+      this.lobbyRoomsPanel.classList.add('hidden');
+    }
     
     this.canvasEngine.clearTable();
   }
@@ -388,7 +441,7 @@ class AppController {
     this.gameStatusLabel.classList.add('hidden');
     this.gameTurnTip.innerText = 'Đang chờ người chơi sẵn sàng...';
 
-    this.canvasEngine.clearTable();
+    this.canvasEngine.clearTable(false);
   }
 
   // Render rooms inside the Lobby grid
@@ -458,6 +511,8 @@ class AppController {
 
     this.currentRoomPlayers = room.players;
     this.isSelfReady = room.ready_players.includes(this.currentUserId);
+    this.currentRoomTurnLimit = room.turn_limit || 15;
+    this.currentRoomBet = room.bet_size;
 
     // Update ready button style
     if (this.isSelfReady) {
@@ -472,11 +527,17 @@ class AppController {
     const counts: Record<number, number> = {};
     const passed: number[] = [];
     let activePlayer: number | null = null;
+    const spectators: number[] = [];
 
     if (room.game_state) {
       activePlayer = room.game_state.active_player;
       room.players.forEach((p: number) => {
-        counts[p] = room.game_state.hands[p]?.length ?? 0;
+        if (room.game_state.hands && p in room.game_state.hands) {
+          counts[p] = room.game_state.hands[p]?.length ?? 0;
+        } else {
+          spectators.push(p);
+          counts[p] = 0;
+        }
       });
       room.game_state.passed_players.forEach((p: number) => passed.push(p));
       
@@ -490,13 +551,23 @@ class AppController {
       this.btnReady.classList.add('hidden');
     }
 
+    if (spectators.includes(this.currentUserId)) {
+      this.canvasEngine.setHand([], false);
+      this.btnReady.classList.add('hidden');
+      this.btnAnnounceSam.classList.add('hidden');
+      this.btnPlayCards.classList.add('hidden');
+      this.btnPass.classList.add('hidden');
+    }
+
     this.canvasEngine.renderRoomState(
       room.players,
       room.ready_players,
       activePlayer,
       counts,
       passed,
-      this.currentUserId
+      this.currentUserId,
+      this.currentRoomTurnLimit,
+      spectators
     );
   }
 
@@ -509,6 +580,14 @@ class AppController {
       this.btnAnnounceSam.classList.add('hidden');
     }
 
+    // Detect spectators (players in currentRoomPlayers who are not in player_card_counts)
+    const spectators: number[] = [];
+    this.currentRoomPlayers.forEach((p: number) => {
+      if (msg.player_card_counts && !(p in msg.player_card_counts)) {
+        spectators.push(p);
+      }
+    });
+
     // Refresh circular player details & counts
     this.canvasEngine.renderRoomState(
       this.currentRoomPlayers,
@@ -516,27 +595,43 @@ class AppController {
       msg.active_player_id,
       msg.player_card_counts,
       msg.passed_players,
-      this.currentUserId
+      this.currentUserId,
+      this.currentRoomTurnLimit,
+      spectators
     );
 
     // Render cards played in center
     this.canvasEngine.setLastPlayed(msg.last_played_cards, msg.last_played_by, true);
 
-    // Show/hide action buttons for current turn
-    if (isActive) {
-      this.gameTurnTip.innerText = 'Đến lượt của bạn!';
-      this.btnPlayCards.classList.remove('hidden');
-      
-      // Can only pass if there is already a card block played on the table
-      if (msg.last_played_cards.length > 0) {
-        this.btnPass.classList.remove('hidden');
-      } else {
-        this.btnPass.classList.add('hidden');
-      }
-    } else {
-      this.gameTurnTip.innerText = `Lượt của Player_${msg.active_player_id}...`;
+    // Remove successfully played cards from the player's hand so they vanish
+    if (msg.last_played_by === this.currentUserId && msg.last_played_cards && msg.last_played_cards.length > 0) {
+      this.canvasEngine.removeCardsFromHand(msg.last_played_cards);
+    }
+
+    if (spectators.includes(this.currentUserId)) {
+      this.canvasEngine.setHand([], false);
       this.btnPlayCards.classList.add('hidden');
       this.btnPass.classList.add('hidden');
+      this.btnAnnounceSam.classList.add('hidden');
+      this.btnReady.classList.add('hidden');
+      this.gameTurnTip.innerText = `Bạn đang xem chơi. Lượt của Player_${msg.active_player_id}...`;
+    } else {
+      // Show/hide action buttons for current turn
+      if (isActive) {
+        this.gameTurnTip.innerText = 'Đến lượt của bạn!';
+        this.btnPlayCards.classList.remove('hidden');
+        
+        // Can only pass if there is already a card block played on the table
+        if (msg.last_played_cards.length > 0) {
+          this.btnPass.classList.remove('hidden');
+        } else {
+          this.btnPass.classList.add('hidden');
+        }
+      } else {
+        this.gameTurnTip.innerText = `Lượt của Player_${msg.active_player_id}...`;
+        this.btnPlayCards.classList.add('hidden');
+        this.btnPass.classList.add('hidden');
+      }
     }
   }
 
@@ -559,24 +654,136 @@ class AppController {
       null,
       counts,
       [],
-      this.currentUserId
+      this.currentUserId,
+      this.currentRoomTurnLimit,
+      []
     );
+
+    // Score / Money calculations
+    const payouts: Record<number, number> = {};
+    this.currentRoomPlayers.forEach(p => {
+      payouts[p] = 0;
+    });
+
+    const activePlayerIds = Object.keys(msg.hands).map(k => parseInt(k));
+    const otherActiveCount = activePlayerIds.length - 1;
+    const bet = this.currentRoomBet;
+
+    // Check Sâm announcer
+    const samAnnouncerId = msg.sam_announcer ? parseInt(msg.sam_announcer) : null;
+
+    if (samAnnouncerId !== null && activePlayerIds.includes(samAnnouncerId)) {
+      // Sâm game
+      if (msg.winner_id === samAnnouncerId) {
+        // Sâm successful! Winner gets 20 * bet from all other active players
+        let totalWin = 0;
+        activePlayerIds.forEach(pId => {
+          if (pId !== msg.winner_id) {
+            const loss = 20 * bet;
+            payouts[pId] = -loss;
+            totalWin += loss;
+          }
+        });
+        payouts[msg.winner_id] = totalWin;
+      } else {
+        // Sâm failed (đền sâm)! The announcer pays 20 * bet * otherActiveCount to the winner (blocker)
+        const penalty = 20 * bet * otherActiveCount;
+        payouts[samAnnouncerId] = -penalty;
+        payouts[msg.winner_id] = penalty;
+        // Other active players pay 0
+        activePlayerIds.forEach(pId => {
+          if (pId !== samAnnouncerId && pId !== msg.winner_id) {
+            payouts[pId] = 0;
+          }
+        });
+      }
+    } else {
+      // Normal game
+      let totalWin = 0;
+      activePlayerIds.forEach(pId => {
+        if (pId !== msg.winner_id) {
+          const hand = msg.hands[pId] || [];
+          const cardsCount = hand.length;
+          const heoCount = hand.filter((c: number) => Math.floor(c / 4) === 12).length;
+          
+          let loss = 0;
+          if (cardsCount === 10) {
+            // Cóng!
+            loss = (20 + heoCount * 10) * bet;
+          } else {
+            loss = (cardsCount + heoCount * 10) * bet;
+          }
+          payouts[pId] = -loss;
+          totalWin += loss;
+        }
+      });
+      payouts[msg.winner_id] = totalWin;
+    }
+
+    // Helper to format cards into HTML colored representations
+    const getCardTextHTML = (val: number): string => {
+      const suits = [
+        { char: '♠', color: '#2563eb' },
+        { char: '♣', color: '#16a34a' },
+        { char: '♦', color: '#ea580c' },
+        { char: '♥', color: '#dc2626' }
+      ];
+      const ranks = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+      const rank = ranks[Math.floor(val / 4)];
+      const suit = suits[val % 4];
+      return `<span style="color: ${suit.color}; font-weight: bold; font-family: Outfit;">${rank}${suit.char}</span>`;
+    };
 
     // Create a detailed overlay message
     const winnerName = msg.winner_id === this.currentUserId ? 'BẠN' : `Player_${msg.winner_id}`;
     let endMessage = `🎉 Người thắng cuộc: <strong>${winnerName}</strong><br/>` + 
                      `💬 Nguyên nhân: <span class="text-pink-500 font-semibold">${msg.reason}</span><br/><br/>`;
     
-    endMessage += `<strong class="text-xs uppercase text-gray-400 tracking-wider">Bài của các kỳ thủ:</strong><br/>`;
+    endMessage += `<strong class="text-xs uppercase text-gray-400 tracking-wider">Kết quả ván đấu:</strong><br/>`;
     
-    Object.keys(msg.hands).forEach((pStr: string) => {
-      const pId = parseInt(pStr);
+    this.currentRoomPlayers.forEach((pId: number) => {
       const isSelf = pId === this.currentUserId;
       const name = isSelf ? 'Bạn' : `Player_${pId}`;
-      const cardsInHand = msg.hands[pId] as number[];
-      
-      // Simple text description of card count
-      endMessage += `• ${name}: <strong>${cardsInHand.length} lá còn lại</strong><br/>`;
+      const payout = payouts[pId] ?? 0;
+      const payoutStr = payout >= 0 ? `+${payout.toLocaleString()}` : `${payout.toLocaleString()}`;
+      const payoutColor = payout >= 0 ? 'text-emerald-500' : 'text-rose-500';
+
+      if (!activePlayerIds.includes(pId)) {
+        endMessage += `• ${name}: <span class="text-gray-400">Xem chơi</span><br/>`;
+      } else {
+        const hand = msg.hands[pId] || [];
+        const cardTextList = hand.map((c: number) => getCardTextHTML(c)).join(' ');
+        
+        let detail = '';
+        if (pId !== msg.winner_id) {
+          const cardsCount = hand.length;
+          const heoCount = hand.filter((c: number) => Math.floor(c / 4) === 12).length;
+          if (samAnnouncerId !== null) {
+            if (pId === samAnnouncerId) {
+              detail = `(Đền Sâm!)`;
+            }
+          } else {
+            if (cardsCount === 10) {
+              detail = `(Cóng!${heoCount > 0 ? `, thối ${heoCount} heo` : ''})`;
+            } else if (heoCount > 0) {
+              detail = `(thối ${heoCount} heo)`;
+            } else {
+              detail = `(${cardsCount} lá)`;
+            }
+          }
+        } else {
+          if (samAnnouncerId === msg.winner_id) {
+            detail = `(Báo Sâm Thành Công!)`;
+          } else if (samAnnouncerId !== null) {
+            detail = `(Chặn Sâm Thành Công!)`;
+          }
+        }
+
+        endMessage += `• ${name}: <strong class="${payoutColor}">${payoutStr} Gold</strong> ${detail}<br/>`;
+        if (hand.length > 0) {
+          endMessage += `&nbsp;&nbsp;&nbsp;&nbsp;Bài còn lại: ${cardTextList}<br/>`;
+        }
+      }
     });
 
     await dialog.show('Ván Đấu Kết Thúc', endMessage, 'alert');
@@ -623,6 +830,7 @@ class AppController {
     const betSize = parseInt(this.inputRoomBet.value);
     const maxPlayers = parseInt(this.selectRoomMaxPlayers.value);
     const password = this.inputRoomPassword.value.trim();
+    const turnLimit = parseInt(this.selectRoomTurnLimit.value);
 
     if (!roomName) {
       this.showCreateRoomError('Vui lòng nhập tên phòng!');
@@ -638,7 +846,7 @@ class AppController {
       this.btnSubmitCreateRoom.classList.add('pointer-events-none', 'opacity-75');
       
       if (this.isServerOnline) {
-        this.wsClient.createRoom(roomName, maxPlayers, betSize, password || undefined);
+        this.wsClient.createRoom(roomName, maxPlayers, betSize, password || undefined, turnLimit);
       } else {
         // Fallback demo sandbox
         this.showGameView(Math.floor(Math.random() * 1000));

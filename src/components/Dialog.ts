@@ -35,7 +35,7 @@ export class CustomDialog {
       this.activeResolve = resolve;
 
       this.titleEl.innerText = title;
-      this.messageEl.innerText = message;
+      this.messageEl.innerHTML = message;
       this.inputEl.value = defaultValue;
 
       if (type === 'prompt') {

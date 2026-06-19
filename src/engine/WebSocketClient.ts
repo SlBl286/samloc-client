@@ -70,13 +70,14 @@ export class WebSocketClient {
     }
   }
 
-  public createRoom(roomName: string, maxPlayers: number, betSize: number, password?: string) {
+  public createRoom(roomName: string, maxPlayers: number, betSize: number, password?: string, turnLimit?: number) {
     this.sendMessage({
       type: 'CreateRoom',
       room_name: roomName,
       max_players: maxPlayers,
       bet_size: betSize,
-      password: password || null
+      password: password || null,
+      turn_limit: turnLimit || null
     });
   }
 
