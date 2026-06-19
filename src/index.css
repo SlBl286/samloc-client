@@ -61,3 +61,56 @@ html, body {
 .modal-scale-up {
   transform: scale(1) !important;
 }
+
+/* Landscape Phone / Small Height Viewport Adjustments */
+@media (max-height: 550px) {
+  #lobby-view h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.8rem !important;
+    margin: 0 !important;
+  }
+  #lobby-view p,
+  #lobby-view .inline-flex {
+    display: none !important;
+  }
+  #lobby-view main {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    gap: 0.5rem !important;
+  }
+  #lobby-view .grid-cols-3,
+  #lobby-view .grid {
+    margin-top: 0 !important;
+    gap: 0.5rem !important;
+  }
+  #lobby-view .glass-card {
+    padding: 0.5rem 0.75rem !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+    text-align: left !important;
+    align-items: center !important;
+  }
+  #lobby-view .glass-card div svg,
+  #lobby-view .glass-card svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+  #lobby-view .glass-card div h3 {
+    font-size: 0.75rem !important;
+  }
+  #lobby-view .glass-card div p {
+    display: none !important;
+  }
+  #lobby-rooms-container {
+    margin-top: 0.25rem !important;
+  }
+  #lobby-rooms-list {
+    max-h: 90px !important;
+  }
+  #ui-layer {
+    padding: 0.75rem !important;
+  }
+  footer {
+    display: none !important;
+  }
+}

@@ -111,15 +111,24 @@ class AppController {
   private setupListeners() {
     const btnQuickPlay = document.getElementById('btn-quick-play');
     const btnCreateRoom = document.getElementById('btn-create-room');
-    const btnDrawCard = document.getElementById('btn-draw-card');
+    const btnJoinCode = document.getElementById('btn-join-code');
 
-    if (btnDrawCard) {
-      btnDrawCard.addEventListener('click', () => {
-        this.canvasEngine.shuffleAndDeal();
-        gsap.fromTo(btnDrawCard, 
-          { scale: 0.95 },
-          { scale: 1, duration: 0.3, ease: 'back.out(1.5)' }
-        );
+    if (btnJoinCode) {
+      btnJoinCode.addEventListener('click', async () => {
+        if (!this.isServerOnline) {
+          await dialog.show('Chơi Offline', 'Tính năng vào phòng theo mã cần kết nối máy chủ!', 'alert');
+          return;
+        }
+
+        const codeStr = await dialog.show('Vào Bàn Theo Mã', 'Nhập mã số phòng chơi (ví dụ: 1):', 'prompt');
+        if (codeStr !== null && codeStr.trim() !== '') {
+          const roomId = parseInt(codeStr.trim());
+          if (isNaN(roomId)) {
+            dialog.show('Lỗi', 'Mã số phòng không hợp lệ!', 'alert');
+            return;
+          }
+          this.wsClient.joinRoom(roomId);
+        }
       });
     }
 
