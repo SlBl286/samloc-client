@@ -44,6 +44,7 @@ class AppController {
   private gameRoomInfo: HTMLElement;
   private gameStatusLabel: HTMLElement;
   private gameTurnTip: HTMLElement;
+  private gameSpectatorsCount: HTMLElement;
   
   // Game Actions
   private btnLeaveRoom: HTMLButtonElement;
@@ -61,6 +62,10 @@ class AppController {
   private currentUsername: string = '';
   private isSelfReady: boolean = false;
   private currentRoomPlayers: number[] = [];
+  private currentRoomReadyPlayers: number[] = [];
+  private currentRoomSpectators: number[] = [];
+  private currentRoomGolds: Record<number, number> = {};
+  private isGameEndRevealPhase: boolean = false;
   private isShowingConnectionError: boolean = false;
 
   constructor() {
@@ -98,6 +103,7 @@ class AppController {
     this.gameRoomInfo = document.getElementById('game-room-info')!;
     this.gameStatusLabel = document.getElementById('game-status-label')!;
     this.gameTurnTip = document.getElementById('game-turn-tip')!;
+    this.gameSpectatorsCount = document.getElementById('game-spectators-count')!;
 
     // 5. Initialize Game Action buttons
     this.btnLeaveRoom = document.getElementById('btn-leave-room') as HTMLButtonElement;
@@ -236,10 +242,20 @@ class AppController {
 
     // Ready Action Toggle
     this.btnReady.addEventListener('click', () => {
-      if (this.isSelfReady) {
-        this.wsClient.unready();
+      const isHost = this.currentRoomPlayers[0] === this.currentUserId;
+      if (isHost) {
+        const otherReadyCount = this.currentRoomReadyPlayers.filter(p => p !== this.currentUserId).length;
+        if (otherReadyCount === 0) {
+          dialog.show('Bắt đầu ván đấu', 'Cần ít nhất 1 người chơi khác sẵn sàng để bắt đầu!', 'alert');
+          return;
+        }
+        this.wsClient.startGame();
       } else {
-        this.wsClient.ready();
+        if (this.isSelfReady) {
+          this.wsClient.unready();
+        } else {
+          this.wsClient.ready();
+        }
       }
     });
 
@@ -359,9 +375,9 @@ class AppController {
         this.canvasEngine.setHand(msg.hand, true);
         
         this.btnReady.classList.add('hidden');
-        this.btnAnnounceSam.classList.remove('hidden');
+        this.btnAnnounceSam.classList.add('hidden');
         this.gameStatusLabel.classList.add('hidden');
-        this.gameTurnTip.innerText = 'Bắt đầu ván đấu! Bạn có muốn báo Sâm?';
+        this.gameTurnTip.innerText = 'Bắt đầu ván đấu!';
         break;
 
       case 'TurnUpdated':
@@ -404,6 +420,8 @@ class AppController {
     this.currentRoomId = null;
     this.isSelfReady = false;
     this.currentRoomPlayers = [];
+    this.currentRoomSpectators = [];
+    this.currentRoomGolds = {};
 
     this.gameView.classList.add('hidden');
     this.lobbyView.classList.remove('hidden');
@@ -506,6 +524,24 @@ class AppController {
 
   // Update game room details based on RoomInfo state
   private updateRoomDetails(room: any) {
+    this.currentRoomSpectators = room.spectators || [];
+    const specCount = this.currentRoomSpectators.length;
+    this.gameSpectatorsCount.innerText = specCount.toString();
+
+    if (this.isGameEndRevealPhase) {
+      this.currentRoomPlayers = room.players;
+      this.isSelfReady = room.ready_players.includes(this.currentUserId);
+      this.currentRoomTurnLimit = room.turn_limit || 15;
+      this.currentRoomBet = room.bet_size;
+      this.currentRoomReadyPlayers = room.ready_players;
+      if (room.player_golds) {
+        for (const k in room.player_golds) {
+          this.currentRoomGolds[parseInt(k)] = room.player_golds[k];
+        }
+      }
+      return;
+    }
+
     this.gameRoomName.innerText = `${room.name} (#${room.id})`;
     this.gameRoomInfo.innerText = `Mức cược: ${room.bet_size.toLocaleString()} Gold | Số người: ${room.players.length}/${room.max_players}`;
 
@@ -513,21 +549,34 @@ class AppController {
     this.isSelfReady = room.ready_players.includes(this.currentUserId);
     this.currentRoomTurnLimit = room.turn_limit || 15;
     this.currentRoomBet = room.bet_size;
+    this.currentRoomReadyPlayers = room.ready_players;
 
-    // Update ready button style
-    if (this.isSelfReady) {
-      this.btnReady.innerText = 'Hủy Sẵn Sàng';
-      this.btnReady.className = 'px-6 py-2 bg-rose-950 hover:bg-rose-900 border border-rose-900 text-rose-400 font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+    const isHost = room.players[0] === this.currentUserId;
+
+    if (isHost) {
+      const otherReadyCount = room.ready_players.filter((p: number) => p !== this.currentUserId).length;
+      this.btnReady.innerText = 'Bắt Đầu';
+      if (otherReadyCount >= 1) {
+        this.btnReady.className = 'px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+      } else {
+        this.btnReady.className = 'px-6 py-2 bg-gray-700 opacity-50 text-gray-400 font-bold text-xs tracking-wider uppercase transition-all cursor-not-allowed';
+      }
     } else {
-      this.btnReady.innerText = 'Sẵn Sàng';
-      this.btnReady.className = 'px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+      // Update ready button style
+      if (this.isSelfReady) {
+        this.btnReady.innerText = 'Hủy Sẵn Sàng';
+        this.btnReady.className = 'px-6 py-2 bg-rose-950 hover:bg-rose-900 border border-rose-900 text-rose-400 font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+      } else {
+        this.btnReady.innerText = 'Sẵn Sàng';
+        this.btnReady.className = 'px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+      }
     }
 
     // Render players in circles
     const counts: Record<number, number> = {};
     const passed: number[] = [];
     let activePlayer: number | null = null;
-    const spectators: number[] = [];
+    const spectators: number[] = [...this.currentRoomSpectators];
 
     if (room.game_state) {
       activePlayer = room.game_state.active_player;
@@ -557,6 +606,16 @@ class AppController {
       this.btnAnnounceSam.classList.add('hidden');
       this.btnPlayCards.classList.add('hidden');
       this.btnPass.classList.add('hidden');
+    } else {
+      if (!room.game_state) {
+        this.btnReady.classList.remove('hidden');
+      }
+    }
+
+    if (room.player_golds) {
+      for (const k in room.player_golds) {
+        this.currentRoomGolds[parseInt(k)] = room.player_golds[k];
+      }
     }
 
     this.canvasEngine.renderRoomState(
@@ -567,7 +626,8 @@ class AppController {
       passed,
       this.currentUserId,
       this.currentRoomTurnLimit,
-      spectators
+      spectators,
+      this.currentRoomGolds
     );
   }
 
@@ -581,12 +641,34 @@ class AppController {
     }
 
     // Detect spectators (players in currentRoomPlayers who are not in player_card_counts)
-    const spectators: number[] = [];
+    const spectators: number[] = [...this.currentRoomSpectators];
     this.currentRoomPlayers.forEach((p: number) => {
       if (msg.player_card_counts && !(p in msg.player_card_counts)) {
-        spectators.push(p);
+        if (!spectators.includes(p)) {
+          spectators.push(p);
+        }
       }
     });
+
+    if (msg.player_golds) {
+      const oldGolds = { ...this.currentRoomGolds };
+      for (const k in msg.player_golds) {
+        const pId = parseInt(k);
+        const newGold = msg.player_golds[k];
+        const oldGold = oldGolds[pId];
+        if (oldGold !== undefined && oldGold !== newGold) {
+          const diff = newGold - oldGold;
+          if (diff > 0) {
+            this.canvasEngine.showSpeechBubble(pId, `🔥 +${diff.toLocaleString()}`, 'win');
+            this.canvasEngine.animateGoldChange(pId, diff);
+          } else if (diff < 0) {
+            this.canvasEngine.showSpeechBubble(pId, `💸 ${diff.toLocaleString()}`, 'lose');
+            this.canvasEngine.animateGoldChange(pId, diff);
+          }
+        }
+        this.currentRoomGolds[pId] = newGold;
+      }
+    }
 
     // Refresh circular player details & counts
     this.canvasEngine.renderRoomState(
@@ -597,7 +679,8 @@ class AppController {
       msg.passed_players,
       this.currentUserId,
       this.currentRoomTurnLimit,
-      spectators
+      spectators,
+      this.currentRoomGolds
     );
 
     // Render cards played in center
@@ -616,27 +699,47 @@ class AppController {
       this.btnReady.classList.add('hidden');
       this.gameTurnTip.innerText = `Bạn đang xem chơi. Lượt của Player_${msg.active_player_id}...`;
     } else {
-      // Show/hide action buttons for current turn
-      if (isActive) {
-        this.gameTurnTip.innerText = 'Đến lượt của bạn!';
-        this.btnPlayCards.classList.remove('hidden');
-        
-        // Can only pass if there is already a card block played on the table
-        if (msg.last_played_cards.length > 0) {
+      if (msg.is_sam_phase) {
+        // Sâm Announce Phase
+        this.btnPlayCards.classList.add('hidden');
+        if (isActive) {
+          this.gameTurnTip.innerText = 'Đến lượt bạn quyết định báo Sâm!';
+          this.btnAnnounceSam.classList.remove('hidden');
+          // Under Sâm Phase, Pass means "Không Báo Sâm"
+          this.btnPass.innerText = 'Không báo Sâm';
           this.btnPass.classList.remove('hidden');
         } else {
+          this.gameTurnTip.innerText = `Đang chờ Player_${msg.active_player_id} báo Sâm...`;
+          this.btnAnnounceSam.classList.add('hidden');
           this.btnPass.classList.add('hidden');
         }
       } else {
-        this.gameTurnTip.innerText = `Lượt của Player_${msg.active_player_id}...`;
-        this.btnPlayCards.classList.add('hidden');
-        this.btnPass.classList.add('hidden');
+        // Normal card playing phase
+        this.btnPass.innerText = 'Bỏ Lượt'; // Restore original button text
+        this.btnAnnounceSam.classList.add('hidden');
+        
+        if (isActive) {
+          this.gameTurnTip.innerText = 'Đến lượt của bạn!';
+          this.btnPlayCards.classList.remove('hidden');
+          
+          // Can only pass if there is already a card block played on the table
+          if (msg.last_played_cards.length > 0) {
+            this.btnPass.classList.remove('hidden');
+          } else {
+            this.btnPass.classList.add('hidden');
+          }
+        } else {
+          this.gameTurnTip.innerText = `Lượt của Player_${msg.active_player_id}...`;
+          this.btnPlayCards.classList.add('hidden');
+          this.btnPass.classList.add('hidden');
+        }
       }
     }
   }
 
   // Handle game end (victory announcements, card reveals)
   private async handleGameEnd(msg: any) {
+    this.isGameEndRevealPhase = true;
     this.gameTurnTip.innerText = 'Trận đấu kết thúc!';
     this.btnPlayCards.classList.add('hidden');
     this.btnPass.classList.add('hidden');
@@ -647,17 +750,6 @@ class AppController {
     this.currentRoomPlayers.forEach((p: number) => {
       counts[p] = msg.hands[p]?.length ?? 0;
     });
-
-    this.canvasEngine.renderRoomState(
-      this.currentRoomPlayers,
-      [],
-      null,
-      counts,
-      [],
-      this.currentUserId,
-      this.currentRoomTurnLimit,
-      []
-    );
 
     // Score / Money calculations
     const payouts: Record<number, number> = {};
@@ -709,9 +801,9 @@ class AppController {
           let loss = 0;
           if (cardsCount === 10) {
             // Cóng!
-            loss = (20 + heoCount * 10) * bet;
+            loss = (15 + heoCount * 5) * bet;
           } else {
-            loss = (cardsCount + heoCount * 10) * bet;
+            loss = (cardsCount + heoCount * 5) * bet;
           }
           payouts[pId] = -loss;
           totalWin += loss;
@@ -720,79 +812,107 @@ class AppController {
       payouts[msg.winner_id] = totalWin;
     }
 
-    // Helper to format cards into HTML colored representations
-    const getCardTextHTML = (val: number): string => {
-      const suits = [
-        { char: '♠', color: '#2563eb' },
-        { char: '♣', color: '#16a34a' },
-        { char: '♦', color: '#ea580c' },
-        { char: '♥', color: '#dc2626' }
-      ];
-      const ranks = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
-      const rank = ranks[Math.floor(val / 4)];
-      const suit = suits[val % 4];
-      return `<span style="color: ${suit.color}; font-weight: bold; font-family: Outfit;">${rank}${suit.char}</span>`;
-    };
+    // Apply payouts to currentRoomGolds locally so they display immediately
+    for (const pId in payouts) {
+      const id = parseInt(pId);
+      this.currentRoomGolds[id] = (this.currentRoomGolds[id] || 100000) + payouts[id];
+      if (this.currentRoomGolds[id] < 0) this.currentRoomGolds[id] = 0;
+    }
 
-    // Create a detailed overlay message
-    const winnerName = msg.winner_id === this.currentUserId ? 'BẠN' : `Player_${msg.winner_id}`;
-    let endMessage = `🎉 Người thắng cuộc: <strong>${winnerName}</strong><br/>` + 
-                     `💬 Nguyên nhân: <span class="text-pink-500 font-semibold">${msg.reason}</span><br/><br/>`;
-    
-    endMessage += `<strong class="text-xs uppercase text-gray-400 tracking-wider">Kết quả ván đấu:</strong><br/>`;
-    
+    // Render the room state with the updated golds
+    this.canvasEngine.renderRoomState(
+      this.currentRoomPlayers,
+      [],
+      null,
+      counts,
+      [],
+      this.currentUserId,
+      this.currentRoomTurnLimit,
+      this.currentRoomSpectators,
+      this.currentRoomGolds
+    );
+
+    // Reveal all remaining cards on the canvas
+    this.canvasEngine.revealPlayerCards(msg.hands, this.currentUserId);
+
+    // Show speech bubbles for everyone's payouts
     this.currentRoomPlayers.forEach((pId: number) => {
-      const isSelf = pId === this.currentUserId;
-      const name = isSelf ? 'Bạn' : `Player_${pId}`;
+      if (!activePlayerIds.includes(pId)) {
+        this.canvasEngine.showSpeechBubble(pId, '👀 XEM CHƠI');
+        return;
+      }
+
       const payout = payouts[pId] ?? 0;
       const payoutStr = payout >= 0 ? `+${payout.toLocaleString()}` : `${payout.toLocaleString()}`;
-      const payoutColor = payout >= 0 ? 'text-emerald-500' : 'text-rose-500';
 
-      if (!activePlayerIds.includes(pId)) {
-        endMessage += `• ${name}: <span class="text-gray-400">Xem chơi</span><br/>`;
-      } else {
+      let detail = '';
+      if (pId !== msg.winner_id) {
         const hand = msg.hands[pId] || [];
-        const cardTextList = hand.map((c: number) => getCardTextHTML(c)).join(' ');
-        
-        let detail = '';
-        if (pId !== msg.winner_id) {
-          const cardsCount = hand.length;
-          const heoCount = hand.filter((c: number) => Math.floor(c / 4) === 12).length;
-          if (samAnnouncerId !== null) {
-            if (pId === samAnnouncerId) {
-              detail = `(Đền Sâm!)`;
-            }
-          } else {
-            if (cardsCount === 10) {
-              detail = `(Cóng!${heoCount > 0 ? `, thối ${heoCount} heo` : ''})`;
-            } else if (heoCount > 0) {
-              detail = `(thối ${heoCount} heo)`;
-            } else {
-              detail = `(${cardsCount} lá)`;
-            }
+        const cardsCount = hand.length;
+        if (samAnnouncerId !== null) {
+          if (pId === samAnnouncerId) {
+            detail = ' (Đền Sâm)';
           }
         } else {
-          if (samAnnouncerId === msg.winner_id) {
-            detail = `(Báo Sâm Thành Công!)`;
-          } else if (samAnnouncerId !== null) {
-            detail = `(Chặn Sâm Thành Công!)`;
+          if (cardsCount === 10) {
+            detail = ' (Cóng)';
           }
         }
-
-        endMessage += `• ${name}: <strong class="${payoutColor}">${payoutStr} Gold</strong> ${detail}<br/>`;
-        if (hand.length > 0) {
-          endMessage += `&nbsp;&nbsp;&nbsp;&nbsp;Bài còn lại: ${cardTextList}<br/>`;
+      } else {
+        if (samAnnouncerId === msg.winner_id) {
+          detail = ' (Báo Sâm)';
+        } else if (samAnnouncerId !== null) {
+          detail = ' (Chặn Sâm)';
+        } else {
+          detail = ' (Thắng)';
         }
       }
+
+      const bubbleText = `${payoutStr} Gold${detail}`;
+      this.canvasEngine.showSpeechBubble(pId, payout >= 0 ? `🎉 ${bubbleText}` : `💸 ${bubbleText}`, payout >= 0 ? 'win' : 'lose');
+      this.canvasEngine.animateGoldChange(pId, payout);
     });
 
-    await dialog.show('Ván Đấu Kết Thúc', endMessage, 'alert');
+    this.gameTurnTip.innerText = 'Trận đấu kết thúc! Chuẩn bị ván mới sau 5 giây...';
 
-    // Show ready button again for next game
-    this.btnReady.innerText = 'Sẵn Sàng';
-    this.btnReady.className = 'px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
-    this.btnReady.classList.remove('hidden');
-    this.isSelfReady = false;
+    setTimeout(() => {
+      // Exit reveal phase
+      this.isGameEndRevealPhase = false;
+
+      // Reset table canvas for new round
+      this.canvasEngine.clearTable(false);
+
+      // Restore ready state and info message
+      this.canvasEngine.renderRoomState(
+        this.currentRoomPlayers,
+        this.currentRoomReadyPlayers,
+        null,
+        {},
+        [],
+        this.currentUserId,
+        this.currentRoomTurnLimit,
+        this.currentRoomSpectators,
+        this.currentRoomGolds
+      );
+
+      // Show ready button again for next game
+      const isHost = this.currentRoomPlayers[0] === this.currentUserId;
+      if (isHost) {
+        const otherReadyCount = this.currentRoomReadyPlayers.filter(p => p !== this.currentUserId).length;
+        this.btnReady.innerText = 'Bắt Đầu';
+        if (otherReadyCount >= 1) {
+          this.btnReady.className = 'px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+        } else {
+          this.btnReady.className = 'px-6 py-2 bg-gray-700 opacity-50 text-gray-400 font-bold text-xs tracking-wider uppercase transition-all cursor-not-allowed';
+        }
+      } else {
+        this.btnReady.innerText = 'Sẵn Sàng';
+        this.btnReady.className = 'px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer';
+      }
+      this.btnReady.classList.remove('hidden');
+      this.isSelfReady = false;
+      this.gameTurnTip.innerText = 'Đang chờ người chơi sẵn sàng...';
+    }, 5000);
   }
 
   // Setup account details upon login

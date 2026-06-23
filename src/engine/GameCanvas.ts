@@ -8,6 +8,7 @@ export class GameCanvas {
   private playerContainer!: Container;
   private pileContainer!: Container;
   private tableGraphic!: Graphics;
+  private revealContainer!: Container;
 
   private cards: Array<{
     container: Container;
@@ -34,6 +35,7 @@ export class GameCanvas {
   private lastSelfId: number = 0;
   private lastSpectators: number[] = [];
   private lastTurnLimitSeconds: number = 15;
+  private lastPlayerGolds: Record<number, number> = {};
 
   // Cached center pile state to re-render on resize
   private lastPlayedCards: number[] = [];
@@ -88,6 +90,9 @@ export class GameCanvas {
     this.cardContainer = new Container();
     this.app.stage.addChild(this.cardContainer);
 
+    this.revealContainer = new Container();
+    this.app.stage.addChild(this.revealContainer);
+
     this.resizeTable();
     window.addEventListener('resize', () => this.resizeTable());
     this.createBackgroundParticles();
@@ -110,31 +115,38 @@ export class GameCanvas {
   // Get dynamic card layout constraints based on screen size
   private getCardDimensions() {
     const w = this.app.screen.width;
-    if (w < 768) {
-      // Mobile phone layouts
-      return {
-        width: 50,
-        height: 72,
-        spacing: 26,  // Compact overlapping spacing
-        offsetY: 80,  // Margin from screen bottom edge
-        avatarRadius: 22,
-        spotRadiusFactor: 0.42,
-        nameFontSize: 10,
-        statusFontSize: 8,
-      };
-    } else {
-      // Desktop monitor layouts
-      return {
-        width: 80,
-        height: 116,
-        spacing: 84,  // Spaced out
-        offsetY: 140, // Standard height
-        avatarRadius: 30,
-        spotRadiusFactor: 0.38,
-        nameFontSize: 11,
-        statusFontSize: 9,
-      };
-    }
+    const h = this.app.screen.height;
+    
+    // Scale factor based on screen size (normalized around 1200x800)
+    const baseScale = Math.min(w / 1200, h / 800);
+    // Keep scale within standard bounds (0.55 to 1.0)
+    const scale = Math.max(0.55, Math.min(1.0, baseScale));
+
+    const cardWidth = Math.round(80 * scale);
+    const cardHeight = Math.round(116 * scale);
+    
+    // Spacing: overlap more on smaller screens
+    const spacing = w < 768 ? Math.round(26 * scale * 1.5) : Math.round(84 * scale);
+    
+    // Position cards from bottom: offsetY is the vertical center of the cards.
+    // We want the card bottom to be 10px from the screen edge on mobile, 20px on desktop.
+    const offsetY = Math.round(cardHeight / 2 + (w < 768 ? 10 : 20));
+    
+    const avatarRadius = Math.round(30 * scale);
+    const spotRadiusFactor = w < 768 ? 0.42 : 0.38;
+    const nameFontSize = Math.max(9, Math.round(11 * scale));
+    const statusFontSize = Math.max(8, Math.round(9 * scale));
+
+    return {
+      width: cardWidth,
+      height: cardHeight,
+      spacing: spacing,
+      offsetY: offsetY,
+      avatarRadius: avatarRadius,
+      spotRadiusFactor: spotRadiusFactor,
+      nameFontSize: nameFontSize,
+      statusFontSize: statusFontSize,
+    };
   }
 
   private resizeTable() {
@@ -181,6 +193,11 @@ export class GameCanvas {
       });
     }
 
+    // Set a CSS custom property for the HTML controls overlay to position itself cleanly above player cards
+    const scale = dims.width / 80;
+    const cardTopEdge = dims.height + (w < 768 ? 10 : 20) + (32 * scale) + 15;
+    document.documentElement.style.setProperty('--card-top-edge', `${cardTopEdge}px`);
+
     // Refresh seat positions around center
     if (this.lastRoomPlayers.length > 0) {
       this.renderRoomState(
@@ -191,7 +208,8 @@ export class GameCanvas {
         this.lastPassedPlayers,
         this.lastSelfId,
         this.lastTurnLimitSeconds,
-        this.lastSpectators
+        this.lastSpectators,
+        this.lastPlayerGolds
       );
     }
 
@@ -470,7 +488,8 @@ export class GameCanvas {
     passedPlayers: number[],
     selfId: number,
     turnLimitSeconds = 15,
-    spectators: number[] = []
+    spectators: number[] = [],
+    playerGolds: Record<number, number> = {}
   ) {
     // Cache inputs first
     this.lastRoomPlayers = players;
@@ -481,6 +500,7 @@ export class GameCanvas {
     this.lastSelfId = selfId;
     this.lastTurnLimitSeconds = turnLimitSeconds;
     this.lastSpectators = spectators;
+    this.lastPlayerGolds = playerGolds;
 
     // Handle timer initialization when active player changes
     if (activePlayerId === null) {
@@ -568,11 +588,28 @@ export class GameCanvas {
         fontWeight: 'bold',
         fill: userId === selfId ? 0xdb2777 : 0xe2e8f0,
       });
-      const displayName = userId === selfId ? 'Bạn' : `Player_${userId}`;
+      const isHost = players[0] === userId;
+      let displayName = userId === selfId ? 'Bạn' : `Player_${userId}`;
+      if (isHost) {
+        displayName = `👑 ${displayName}`;
+      }
       const nameText = new Text({ text: displayName, style: nameStyle });
       nameText.anchor.set(0.5);
       nameText.position.set(0, avatarSize + (w < 768 ? 10 : 14));
       spotContainer.addChild(nameText);
+
+      // 4.5. Gold Balance Display
+      const goldVal = playerGolds[userId] ?? 100000;
+      const goldStyle = new TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: dims.statusFontSize,
+        fontWeight: 'bold',
+        fill: 0xfacc15, // Yellow gold color
+      });
+      const goldText = new Text({ text: `💰 ${goldVal.toLocaleString()}`, style: goldStyle });
+      goldText.anchor.set(0.5);
+      goldText.position.set(0, avatarSize + (w < 768 ? 20 : 26));
+      spotContainer.addChild(goldText);
 
       // 5. Status message
       let statusStr = 'ĐANG CHỜ';
@@ -591,6 +628,9 @@ export class GameCanvas {
       } else if (isReady) {
         statusStr = 'SẴN SÀNG';
         statusColor = 0x10b981; // Green
+      } else if (isHost) {
+        statusStr = 'CHỦ PHÒNG';
+        statusColor = 0xeab308; // Yellow/Gold
       }
 
       const statusStyle = new TextStyle({
@@ -601,7 +641,7 @@ export class GameCanvas {
       });
       const statusText = new Text({ text: statusStr, style: statusStyle });
       statusText.anchor.set(0.5);
-      statusText.position.set(0, avatarSize + (w < 768 ? 20 : 26));
+      statusText.position.set(0, avatarSize + (w < 768 ? 30 : 38));
       spotContainer.addChild(statusText);
 
       // 6. Card Badge Pill
@@ -738,8 +778,98 @@ export class GameCanvas {
     });
   }
 
+  // Reveal remaining players' cards when the game ends
+  public revealPlayerCards(hands: Record<number, number[]>, selfId: number) {
+    this.revealContainer.removeChildren();
+
+    const w = this.app.screen.width;
+    
+    // Scale and spacing for revealed cards
+    const scale = 0.35;
+    const spacing = 18;
+
+    for (const k in hands) {
+      const userId = parseInt(k);
+      if (userId === selfId) {
+        continue;
+      }
+
+      const hand = hands[userId] || [];
+      if (hand.length === 0) continue;
+
+      const spot = this.playerSpots.get(userId);
+      if (spot) {
+        // Lay out tiny cards horizontally
+        // Position them relative to the avatar spot
+        let startX = 0;
+        let startY = spot.y - 10;
+
+        if (spot.x < w / 3) {
+          // Left side: place cards to the right of avatar
+          startX = spot.x + 45;
+        } else if (spot.x > (w * 2) / 3) {
+          // Right side: place cards to the left of avatar
+          const totalWidth = spacing * (hand.length - 1);
+          startX = spot.x - 45 - totalWidth;
+        } else {
+          // Top players: place cards below avatar/status
+          const totalWidth = spacing * (hand.length - 1);
+          startX = spot.x - totalWidth / 2;
+          startY = spot.y + 48;
+        }
+
+        // Sort hand values ascending by weight
+        const sortedHand = [...hand].sort((a, b) => {
+          const getW = (c: number) => {
+            const r = Math.floor(c / 4);
+            if (r === 12) return 15; // 2
+            if (r === 11) return 14; // A
+            return r + 3;
+          };
+          return getW(a) - getW(b);
+        });
+
+        sortedHand.forEach((val, idx) => {
+          const card = this.createCard(val);
+          card.container.scale.set(0);
+          card.container.alpha = 0;
+          card.container.eventMode = 'none'; // disable pointer events
+          
+          const cardX = startX + idx * spacing;
+          
+          // Initial position is at the player's avatar
+          card.container.position.set(spot.x, spot.y);
+          const startRot = (Math.random() - 0.5) * 0.5;
+          card.container.rotation = startRot;
+          
+          this.revealContainer.addChild(card.container);
+
+          // Staggered deal animation using GSAP
+          gsap.to(card.container, {
+            x: cardX,
+            y: startY,
+            rotation: 0,
+            alpha: 1,
+            duration: 0.5,
+            ease: 'back.out(1.1)',
+            delay: idx * 0.08,
+          });
+
+          gsap.to(card.container.scale, {
+            x: scale,
+            y: scale,
+            duration: 0.5,
+            ease: 'back.out(1.1)',
+            delay: idx * 0.08,
+          });
+        });
+      }
+    }
+  }
+
   // Clear the table for a new game or round
   public clearTable(clearPlayers = true) {
+    this.revealContainer.removeChildren();
     this.pileContainer.removeChildren();
     this.cards.forEach(c => this.cardContainer.removeChild(c.container));
     this.cards = [];
@@ -798,7 +928,7 @@ export class GameCanvas {
   }
 
   // Temporary speech bubble notification for in-game statuses
-  public showSpeechBubble(userId: number, text: string) {
+  public showSpeechBubble(userId: number, text: string, type: 'win' | 'lose' | 'default' = 'default') {
     if (!this.playerSpots.has(userId)) return;
 
     const w = this.app.screen.width;
@@ -828,12 +958,19 @@ export class GameCanvas {
     const bubbleW = Math.max(45, txt.width + 12);
     const bubbleH = w < 768 ? 18 : 22;
 
+    let bgColor = 0xdb2777; // default flat pink
+    if (type === 'win') {
+      bgColor = 0x10b981; // green
+    } else if (type === 'lose') {
+      bgColor = 0xef4444; // red
+    }
+
     const bg = new Graphics();
     bg.roundRect(-bubbleW / 2, -bubbleH / 2, bubbleW, bubbleH, 4);
-    bg.fill({ color: 0xdb2777 }); // Sleek flat pink
+    bg.fill({ color: bgColor });
     // triangle pointing down
     bg.poly([-4, bubbleH / 2, 4, bubbleH / 2, 0, bubbleH / 2 + 4]);
-    bg.fill({ color: 0xdb2777 });
+    bg.fill({ color: bgColor });
 
     bubble.addChild(bg);
     bubble.addChild(txt);
@@ -847,17 +984,90 @@ export class GameCanvas {
       ease: 'back.out(1.5)',
     });
 
-    // Fade out after 2.5s
+    // Fade out after 2.5s (or longer if game end)
+    const isGameEnd = type === 'win' || type === 'lose';
+    const delay = isGameEnd ? 4.5 : 2.2;
     gsap.to(bubble, {
       alpha: 0,
       duration: 0.3,
-      delay: 2.2,
+      delay: delay,
       onComplete: () => {
         if (spot.children.includes(bubble)) {
           spot.removeChild(bubble);
         }
       }
     });
+  }
+
+  // Animate floating gold value above avatar when gold changes
+  public animateGoldChange(userId: number, amount: number) {
+    if (!this.playerSpots.has(userId) || amount === 0) return;
+
+    const w = this.app.screen.width;
+    const spot = this.playerSpots.get(userId)!;
+
+    const container = new Container();
+    container.name = 'floating-gold';
+
+    const isWinner = amount > 0;
+    const prefix = isWinner ? '+' : '';
+    const textStr = `${prefix}${amount.toLocaleString()}`;
+
+    const textStyle = new TextStyle({
+      fontFamily: 'Outfit',
+      fontSize: w < 768 ? 14 : 18,
+      fontWeight: 'bold',
+      fill: isWinner ? 0x22c55e : 0xef4444, // Green for winner, Red for loser
+      stroke: { width: 3, color: 0x000000 },
+    });
+
+    const textNode = new Text({ text: textStr, style: textStyle });
+    textNode.anchor.set(0.5);
+    container.addChild(textNode);
+
+    if (isWinner) {
+      const coinStyle = new TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: w < 768 ? 14 : 18,
+      });
+      const coinNode = new Text({ text: ' 🪙', style: coinStyle });
+      coinNode.anchor.set(0.5);
+      coinNode.position.set(textNode.width / 2 + 10, 0);
+      container.addChild(coinNode);
+      textNode.position.set(-10, 0);
+    }
+
+    // Position container at spot center
+    container.position.set(spot.x, spot.y);
+    container.alpha = 0;
+    container.scale.set(0.5);
+
+    this.app.stage.addChild(container);
+
+    // Timeline for floating animation
+    gsap.timeline()
+      .to(container, {
+        y: spot.y - 65,
+        alpha: 1,
+        duration: 0.45,
+        ease: 'back.out(1.5)',
+      })
+      .to(container.scale, {
+        x: 1.1,
+        y: 1.1,
+        duration: 0.45,
+        ease: 'back.out(1.5)',
+      }, 0)
+      .to(container, {
+        y: spot.y - 105,
+        alpha: 0,
+        duration: 1.2,
+        ease: 'power1.in',
+        delay: 0.6,
+        onComplete: () => {
+          this.app.stage.removeChild(container);
+        }
+      });
   }
 
   // Interactive sandbox presentation wrapper

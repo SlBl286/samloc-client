@@ -107,6 +107,12 @@ export class WebSocketClient {
     });
   }
 
+  public startGame() {
+    this.sendMessage({
+      type: 'StartGame'
+    });
+  }
+
   public playCards(cards: number[]) {
     this.sendMessage({
       type: 'PlayCards',
