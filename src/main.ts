@@ -67,6 +67,7 @@ class AppController {
   private currentRoomGolds: Record<number, number> = {};
   private isGameEndRevealPhase: boolean = false;
   private isShowingConnectionError: boolean = false;
+  private lastSamChoices: Record<number, boolean> = {};
 
   constructor() {
     // 1. Initialize Screen Views
@@ -262,12 +263,19 @@ class AppController {
     // Pass Action
     this.btnPass.addEventListener('click', () => {
       this.wsClient.passTurn();
+      if (this.btnPass.innerText.includes('Không báo Sâm') || this.btnPass.textContent?.includes('Không báo Sâm')) {
+        this.btnAnnounceSam.classList.add('hidden');
+        this.btnPass.classList.add('hidden');
+        this.gameTurnTip.innerText = 'Chờ người chơi khác...';
+      }
     });
 
     // Announce Sâm Action
     this.btnAnnounceSam.addEventListener('click', () => {
       this.wsClient.announceSam();
       this.btnAnnounceSam.classList.add('hidden');
+      this.btnPass.classList.add('hidden');
+      this.gameTurnTip.innerText = 'Chờ người chơi khác...';
     });
 
     // Play Cards Action
@@ -277,6 +285,18 @@ class AppController {
         dialog.show('Đánh bài', 'Vui lòng click chọn ít nhất 1 quân bài!', 'alert');
         return;
       }
+
+      const hand = this.canvasEngine.getHandCards();
+      const onlyTwos = hand.length > 0 && hand.every(v => Math.floor(v / 4) === 12);
+      if (onlyTwos) {
+        dialog.show('Đánh bài', 'Bạn chỉ còn 2, chỉ được bỏ lượt!', 'alert');
+        return;
+      }
+      if (selected.length === hand.length && selected.some(v => Math.floor(v / 4) === 12)) {
+        dialog.show('Đánh bài', 'Không được đánh 2 cuối cùng!', 'alert');
+        return;
+      }
+
       this.wsClient.playCards(selected);
     });
 
@@ -627,7 +647,9 @@ class AppController {
       this.currentUserId,
       this.currentRoomTurnLimit,
       spectators,
-      this.currentRoomGolds
+      this.currentRoomGolds,
+      room.game_state ? room.game_state.is_sam_phase : false,
+      room.game_state ? room.game_state.sam_choices : {}
     );
   }
 
@@ -680,11 +702,27 @@ class AppController {
       this.currentUserId,
       this.currentRoomTurnLimit,
       spectators,
-      this.currentRoomGolds
+      this.currentRoomGolds,
+      msg.is_sam_phase,
+      msg.sam_choices
     );
 
     // Render cards played in center
     this.canvasEngine.setLastPlayed(msg.last_played_cards, msg.last_played_by, true);
+
+    // Render speech bubbles for Báo Sâm choices
+    if (msg.is_sam_phase && msg.sam_choices) {
+      for (const k in msg.sam_choices) {
+        const pId = parseInt(k);
+        const choseSam = msg.sam_choices[k];
+        if (this.lastSamChoices[pId] === undefined || this.lastSamChoices[pId] !== choseSam) {
+          this.canvasEngine.showSpeechBubble(pId, choseSam ? '⚡ BÁO SÂM!' : '❌ KHÔNG SÂM');
+          this.lastSamChoices[pId] = choseSam;
+        }
+      }
+    } else if (!msg.is_sam_phase) {
+      this.lastSamChoices = {};
+    }
 
     // Remove successfully played cards from the player's hand so they vanish
     if (msg.last_played_by === this.currentUserId && msg.last_played_cards && msg.last_played_cards.length > 0) {
@@ -697,19 +735,33 @@ class AppController {
       this.btnPass.classList.add('hidden');
       this.btnAnnounceSam.classList.add('hidden');
       this.btnReady.classList.add('hidden');
-      this.gameTurnTip.innerText = `Bạn đang xem chơi. Lượt của Player_${msg.active_player_id}...`;
+      if (msg.is_sam_phase) {
+        this.gameTurnTip.innerText = 'Đang trong giai đoạn báo Sâm...';
+      } else {
+        this.gameTurnTip.innerText = `Bạn đang xem chơi. Lượt của Player_${msg.active_player_id}...`;
+      }
     } else {
       if (msg.is_sam_phase) {
         // Sâm Announce Phase
         this.btnPlayCards.classList.add('hidden');
-        if (isActive) {
-          this.gameTurnTip.innerText = 'Đến lượt bạn quyết định báo Sâm!';
+        
+        const isGamePlayer = msg.player_card_counts && (
+          msg.player_card_counts[this.currentUserId] !== undefined || 
+          msg.player_card_counts[this.currentUserId.toString()] !== undefined
+        );
+        const hasChosen = msg.sam_choices && (
+          msg.sam_choices[this.currentUserId] !== undefined || 
+          msg.sam_choices[this.currentUserId.toString()] !== undefined
+        );
+
+        if (isGamePlayer && !hasChosen) {
+          this.gameTurnTip.innerText = 'Vui lòng chọn Báo Sâm hoặc Không báo Sâm!';
           this.btnAnnounceSam.classList.remove('hidden');
           // Under Sâm Phase, Pass means "Không Báo Sâm"
           this.btnPass.innerText = 'Không báo Sâm';
           this.btnPass.classList.remove('hidden');
         } else {
-          this.gameTurnTip.innerText = `Đang chờ Player_${msg.active_player_id} báo Sâm...`;
+          this.gameTurnTip.innerText = 'Chờ người chơi khác...';
           this.btnAnnounceSam.classList.add('hidden');
           this.btnPass.classList.add('hidden');
         }

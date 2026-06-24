@@ -36,6 +36,8 @@ export class GameCanvas {
   private lastSpectators: number[] = [];
   private lastTurnLimitSeconds: number = 15;
   private lastPlayerGolds: Record<number, number> = {};
+  private lastIsSamPhase: boolean = false;
+  private lastSamChoices: Record<number, boolean> = {};
 
   // Cached center pile state to re-render on resize
   private lastPlayedCards: number[] = [];
@@ -209,7 +211,9 @@ export class GameCanvas {
         this.lastSelfId,
         this.lastTurnLimitSeconds,
         this.lastSpectators,
-        this.lastPlayerGolds
+        this.lastPlayerGolds,
+        this.lastIsSamPhase,
+        this.lastSamChoices
       );
     }
 
@@ -479,6 +483,11 @@ export class GameCanvas {
     return this.cards.filter(c => c.isSelected).map(c => c.value);
   }
 
+  // Get all card values in the player's hand
+  public getHandCards(): number[] {
+    return this.cards.map(c => c.value);
+  }
+
   // Render all active room player spots in circular layout
   public renderRoomState(
     players: number[],
@@ -489,7 +498,9 @@ export class GameCanvas {
     selfId: number,
     turnLimitSeconds = 15,
     spectators: number[] = [],
-    playerGolds: Record<number, number> = {}
+    playerGolds: Record<number, number> = {},
+    isSamPhase = false,
+    samChoices: Record<number, boolean> = {}
   ) {
     // Cache inputs first
     this.lastRoomPlayers = players;
@@ -501,6 +512,8 @@ export class GameCanvas {
     this.lastTurnLimitSeconds = turnLimitSeconds;
     this.lastSpectators = spectators;
     this.lastPlayerGolds = playerGolds;
+    this.lastIsSamPhase = isSamPhase;
+    this.lastSamChoices = samChoices;
 
     // Handle timer initialization when active player changes
     if (activePlayerId === null) {
@@ -622,6 +635,9 @@ export class GameCanvas {
       if (isSpectator) {
         statusStr = 'XEM CHƠI';
         statusColor = 0xa8a29e; // Stone / light gray
+      } else if (isSamPhase && samChoices && samChoices[userId] !== undefined) {
+        statusStr = 'CHỜ NGƯỜI KHÁC';
+        statusColor = 0x60a5fa; // Nice sky blue
       } else if (isPassed) {
         statusStr = 'PASS';
         statusColor = 0xef4444; // Red
