@@ -131,4 +131,12 @@ export class WebSocketClient {
       type: 'AnnounceSam'
     });
   }
+
+  public updateProfile(displayName: string, avatarUrl: string) {
+    this.sendMessage({
+      type: 'UpdateProfile',
+      display_name: displayName,
+      avatar_url: avatarUrl
+    });
+  }
 }

@@ -5,6 +5,9 @@ export interface UserSession {
   user_id: number;
   username: string;
   token: string;
+  display_name?: string;
+  avatar_url?: string;
+  gold?: number;
 }
 
 export class AuthManager {
@@ -169,12 +172,18 @@ export class AuthManager {
           token: data.token,
           user_id: data.user_id,
           username: data.username,
+          display_name: data.display_name,
+          avatar_url: data.avatar_url,
+          gold: data.gold,
         };
 
         this.currentUser = session;
         localStorage.setItem('samloc_token', session.token);
         localStorage.setItem('samloc_username', session.username);
         localStorage.setItem('samloc_user_id', String(session.user_id));
+        localStorage.setItem('samloc_display_name', session.display_name || '');
+        localStorage.setItem('samloc_avatar_url', session.avatar_url || '');
+        localStorage.setItem('samloc_gold', String(session.gold || 500000));
 
         this.updateUI();
         this.hideModal();
@@ -182,7 +191,8 @@ export class AuthManager {
         if (this.onLoginSuccessCallback) {
           this.onLoginSuccessCallback(session);
         }
-        await dialog.show('Đăng nhập', `Chào mừng trở lại, ${session.username}!`, 'alert');
+        const displayName = session.display_name || session.username;
+        await dialog.show('Đăng nhập', `Chào mừng trở lại, ${displayName}!`, 'alert');
       }
     } catch (err: any) {
       this.showError(err.message || 'Lỗi kết nối server!');
@@ -196,6 +206,9 @@ export class AuthManager {
     localStorage.removeItem('samloc_token');
     localStorage.removeItem('samloc_username');
     localStorage.removeItem('samloc_user_id');
+    localStorage.removeItem('samloc_display_name');
+    localStorage.removeItem('samloc_avatar_url');
+    localStorage.removeItem('samloc_gold');
     this.currentUser = null;
     this.updateUI();
     
@@ -208,12 +221,18 @@ export class AuthManager {
     const token = localStorage.getItem('samloc_token');
     const username = localStorage.getItem('samloc_username');
     const userId = localStorage.getItem('samloc_user_id');
+    const displayName = localStorage.getItem('samloc_display_name') || '';
+    const avatarUrl = localStorage.getItem('samloc_avatar_url') || '';
+    const gold = parseInt(localStorage.getItem('samloc_gold') || '500000');
 
     if (token && username && userId) {
-      const session = {
+      const session: UserSession = {
         token,
         username,
-        user_id: parseInt(userId)
+        user_id: parseInt(userId),
+        display_name: displayName,
+        avatar_url: avatarUrl,
+        gold: gold,
       };
       this.currentUser = session;
       this.updateUI();
@@ -227,7 +246,7 @@ export class AuthManager {
 
   private updateUI() {
     if (this.currentUser && this.currentUser.token) {
-      this.usernameDisplay.innerText = this.currentUser.username;
+      this.usernameDisplay.innerText = this.currentUser.display_name || this.currentUser.username;
       this.userProfileWidget.classList.remove('hidden');
       this.btnShowLogin.classList.add('hidden');
     } else {

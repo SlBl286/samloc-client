@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Graphics, Text, TextStyle, Sprite, Assets } from 'pixi.js';
 import { gsap } from 'gsap';
 
 export class GameCanvas {
@@ -500,7 +500,9 @@ export class GameCanvas {
     spectators: number[] = [],
     playerGolds: Record<number, number> = {},
     isSamPhase = false,
-    samChoices: Record<number, boolean> = {}
+    samChoices: Record<number, boolean> = {},
+    playerNames: Record<number, string> = {},
+    playerAvatars: Record<number, string> = {}
   ) {
     // Cache inputs first
     this.lastRoomPlayers = players;
@@ -568,6 +570,31 @@ export class GameCanvas {
       avatar.stroke({ width: 2, color: 0x272731 });
       spotContainer.addChild(avatar);
 
+      // Load avatar image asynchronously if present
+      const avatarUrl = playerAvatars[userId];
+      if (avatarUrl) {
+        const imgContainer = new Container();
+        spotContainer.addChild(imgContainer);
+
+        Assets.load(avatarUrl).then((texture) => {
+          if (spotContainer.destroyed) return;
+          const avatarSprite = new Sprite(texture);
+          avatarSprite.anchor.set(0.5);
+          avatarSprite.width = avatarSize * 2;
+          avatarSprite.height = avatarSize * 2;
+
+          const maskGraphic = new Graphics();
+          maskGraphic.circle(0, 0, avatarSize);
+          maskGraphic.fill({ color: 0xffffff });
+          imgContainer.addChild(maskGraphic);
+          avatarSprite.mask = maskGraphic;
+
+          imgContainer.addChild(avatarSprite);
+        }).catch((err) => {
+          console.error("Failed to load avatar image:", err);
+        });
+      }
+
       // 2. Highlight border for Active Player
       if (activePlayerId === userId) {
         const activeOutline = new Graphics();
@@ -602,7 +629,7 @@ export class GameCanvas {
         fill: userId === selfId ? 0xdb2777 : 0xe2e8f0,
       });
       const isHost = players[0] === userId;
-      let displayName = userId === selfId ? 'Bạn' : `Player_${userId}`;
+      let displayName = playerNames[userId] || (userId === selfId ? 'Bạn' : `Player_${userId}`);
       if (isHost) {
         displayName = `👑 ${displayName}`;
       }

@@ -35,8 +35,15 @@
             </button>
 
             <!-- User Widget (Logged-in details) -->
-            <div id="user-profile-widget" class="hidden flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] backdrop-blur-md">
-              <span class="text-gray-400">Chào, <strong id="username-display" class="text-pink-500 font-semibold">Player</strong></span>
+            <div id="user-profile-widget" class="hidden flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] backdrop-blur-md pointer-events-auto">
+              <div class="relative w-6 h-6 rounded-full overflow-hidden border border-pink-500/30 flex items-center justify-center bg-pink-600/10 cursor-pointer" id="user-widget-avatar-container">
+                <img id="user-avatar-display" class="w-full h-full object-cover hidden" src="" />
+                <span id="user-avatar-fallback" class="font-bold text-[10px] text-pink-500">U</span>
+              </div>
+              <span class="text-gray-400">
+                Chào, <strong id="username-display" class="text-pink-500 font-semibold cursor-pointer hover:underline">Player</strong>
+                <span id="lobby-user-gold" class="text-amber-500 font-bold ml-1.5">💰 500,000</span>
+              </span>
               <span class="w-[1px] h-3 bg-white/10"></span>
               <button id="btn-logout" class="text-gray-400 hover:text-white cursor-pointer transition-colors font-medium">Đăng xuất</button>
             </div>
@@ -278,6 +285,49 @@
           Chơi Offline (Sandbox)
         </button>
 
+      </div>
+    </div>
+
+    <!-- Edit Profile Modal Overlay -->
+    <div id="edit-profile-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-[#050508]/75 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+      <div class="glass-panel w-full max-w-sm p-6 rounded-xl border border-white/10 scale-95 transition-all duration-300 transform" id="edit-profile-card">
+        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-pink-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+          Chỉnh Sửa Hồ Sơ
+        </h3>
+        <div id="edit-profile-error" class="hidden text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 text-xs mb-4 text-center"></div>
+        
+        <form id="edit-profile-form" class="space-y-4" onsubmit="return false;">
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Tên hiển thị</label>
+            <input id="edit-display-name" type="text" placeholder="Nhập tên hiển thị..." required maxLength="20"
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+          
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Chọn ảnh đại diện có sẵn</label>
+            <div class="grid grid-cols-6 gap-2 my-2" id="preset-avatars-grid">
+              <!-- Dynamically generated preset options -->
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Hoặc đường dẫn ảnh tự chọn (URL)</label>
+            <input id="edit-avatar-url" type="text" placeholder="https://example.com/avatar.jpg"
+                   class="w-full px-3 py-2 bg-white/5 border border-white/10 focus:border-pink-600 rounded-lg text-white text-xs focus:outline-none transition-all" />
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button id="btn-cancel-edit-profile" type="button" class="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-lg text-xs font-semibold transition-all cursor-pointer">
+              Hủy
+            </button>
+            <button id="btn-submit-edit-profile" type="submit" class="flex-1 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer">
+              Lưu lại
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 

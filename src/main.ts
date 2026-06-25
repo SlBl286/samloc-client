@@ -68,6 +68,34 @@ class AppController {
   private isGameEndRevealPhase: boolean = false;
   private isShowingConnectionError: boolean = false;
   private lastSamChoices: Record<number, boolean> = {};
+  private currentRoomNames: Record<number, string> = {};
+  private currentRoomAvatars: Record<number, string> = {};
+  private userDisplayName: string = '';
+  private userAvatarUrl: string = '';
+  private userGold: number = 500000;
+
+  // Edit Profile Elements
+  private editProfileModal!: HTMLElement;
+  private editProfileCard!: HTMLElement;
+  private editProfileForm!: HTMLElement;
+  private editProfileError!: HTMLElement;
+  private inputDisplayName!: HTMLInputElement;
+  private inputAvatarUrl!: HTMLInputElement;
+  private btnCancelEditProfile!: HTMLButtonElement;
+  private btnSubmitEditProfile!: HTMLButtonElement;
+  private userWidgetAvatarContainer!: HTMLElement;
+  private userAvatarDisplay!: HTMLImageElement;
+  private userAvatarFallback!: HTMLElement;
+  private lobbyUserGold!: HTMLElement;
+
+  private presetAvatars = [
+    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
+  ];
 
   constructor() {
     // 1. Initialize Screen Views
@@ -98,6 +126,20 @@ class AppController {
     this.selectRoomTurnLimit = document.getElementById('create-room-turn-limit') as HTMLSelectElement;
     this.btnCancelCreateRoom = document.getElementById('btn-cancel-create-room') as HTMLButtonElement;
     this.btnSubmitCreateRoom = document.getElementById('btn-submit-create-room') as HTMLButtonElement;
+
+    // Edit Profile Modal Elements
+    this.editProfileModal = document.getElementById('edit-profile-modal')!;
+    this.editProfileCard = document.getElementById('edit-profile-card')!;
+    this.editProfileForm = document.getElementById('edit-profile-form')!;
+    this.editProfileError = document.getElementById('edit-profile-error')!;
+    this.inputDisplayName = document.getElementById('edit-display-name') as HTMLInputElement;
+    this.inputAvatarUrl = document.getElementById('edit-avatar-url') as HTMLInputElement;
+    this.btnCancelEditProfile = document.getElementById('btn-cancel-edit-profile') as HTMLButtonElement;
+    this.btnSubmitEditProfile = document.getElementById('btn-submit-edit-profile') as HTMLButtonElement;
+    this.userWidgetAvatarContainer = document.getElementById('user-widget-avatar-container')!;
+    this.userAvatarDisplay = document.getElementById('user-avatar-display') as HTMLImageElement;
+    this.userAvatarFallback = document.getElementById('user-avatar-fallback')!;
+    this.lobbyUserGold = document.getElementById('lobby-user-gold')!;
 
     // 4. Initialize Game Room UI overlays
     this.gameRoomName = document.getElementById('game-room-name')!;
@@ -320,6 +362,21 @@ class AppController {
     if (btnFullscreenGame) {
       btnFullscreenGame.addEventListener('click', toggleFullscreen);
     }
+
+    // Edit Profile triggers
+    if (this.userWidgetAvatarContainer) {
+      this.userWidgetAvatarContainer.addEventListener('click', () => this.showEditProfileModal());
+    }
+    const usernameDisplay = document.getElementById('username-display');
+    if (usernameDisplay) {
+      usernameDisplay.addEventListener('click', () => this.showEditProfileModal());
+    }
+    if (this.btnCancelEditProfile) {
+      this.btnCancelEditProfile.addEventListener('click', () => this.hideEditProfileModal());
+    }
+    if (this.editProfileForm) {
+      this.editProfileForm.addEventListener('submit', () => this.handleEditProfileSubmit());
+    }
   }
 
   // Server Status State Machine
@@ -367,6 +424,35 @@ class AppController {
     console.log('Main App received WS Message:', msg);
 
     switch (msg.type) {
+      case 'UserProfile':
+        this.userDisplayName = msg.display_name;
+        this.userAvatarUrl = msg.avatar_url;
+        this.userGold = msg.gold;
+        
+        // Update top right widget
+        const usernameDisplay = document.getElementById('username-display')!;
+        usernameDisplay.innerText = this.userDisplayName || this.currentUsername;
+        
+        if (this.lobbyUserGold) {
+          this.lobbyUserGold.innerText = `💰 ${this.userGold.toLocaleString()}`;
+        }
+        
+        if (this.userAvatarUrl) {
+          this.userAvatarDisplay.src = this.userAvatarUrl;
+          this.userAvatarDisplay.classList.remove('hidden');
+          this.userAvatarFallback.classList.add('hidden');
+        } else {
+          this.userAvatarDisplay.classList.add('hidden');
+          this.userAvatarFallback.classList.remove('hidden');
+          this.userAvatarFallback.innerText = (this.userDisplayName || this.currentUsername || 'U').charAt(0).toUpperCase();
+        }
+        
+        // Update localStorage cache
+        localStorage.setItem('samloc_display_name', this.userDisplayName || '');
+        localStorage.setItem('samloc_avatar_url', this.userAvatarUrl || '');
+        localStorage.setItem('samloc_gold', String(this.userGold));
+        break;
+
       case 'RoomList':
         this.renderRoomsList(msg.rooms);
         break;
@@ -556,7 +642,26 @@ class AppController {
       this.currentRoomReadyPlayers = room.ready_players;
       if (room.player_golds) {
         for (const k in room.player_golds) {
-          this.currentRoomGolds[parseInt(k)] = room.player_golds[k];
+          const uId = parseInt(k);
+          const goldVal = room.player_golds[k];
+          this.currentRoomGolds[uId] = goldVal;
+          if (uId === this.currentUserId) {
+            this.userGold = goldVal;
+            if (this.lobbyUserGold) {
+              this.lobbyUserGold.innerText = `💰 ${this.userGold.toLocaleString()}`;
+            }
+            localStorage.setItem('samloc_gold', String(this.userGold));
+          }
+        }
+      }
+      if (room.player_names) {
+        for (const k in room.player_names) {
+          this.currentRoomNames[parseInt(k)] = room.player_names[k];
+        }
+      }
+      if (room.player_avatars) {
+        for (const k in room.player_avatars) {
+          this.currentRoomAvatars[parseInt(k)] = room.player_avatars[k];
         }
       }
       return;
@@ -570,6 +675,19 @@ class AppController {
     this.currentRoomTurnLimit = room.turn_limit || 15;
     this.currentRoomBet = room.bet_size;
     this.currentRoomReadyPlayers = room.ready_players;
+
+    if (room.player_names) {
+      this.currentRoomNames = {};
+      for (const k in room.player_names) {
+        this.currentRoomNames[parseInt(k)] = room.player_names[k];
+      }
+    }
+    if (room.player_avatars) {
+      this.currentRoomAvatars = {};
+      for (const k in room.player_avatars) {
+        this.currentRoomAvatars[parseInt(k)] = room.player_avatars[k];
+      }
+    }
 
     const isHost = room.players[0] === this.currentUserId;
 
@@ -634,7 +752,16 @@ class AppController {
 
     if (room.player_golds) {
       for (const k in room.player_golds) {
-        this.currentRoomGolds[parseInt(k)] = room.player_golds[k];
+        const uId = parseInt(k);
+        const goldVal = room.player_golds[k];
+        this.currentRoomGolds[uId] = goldVal;
+        if (uId === this.currentUserId) {
+          this.userGold = goldVal;
+          if (this.lobbyUserGold) {
+            this.lobbyUserGold.innerText = `💰 ${this.userGold.toLocaleString()}`;
+          }
+          localStorage.setItem('samloc_gold', String(this.userGold));
+        }
       }
     }
 
@@ -649,7 +776,9 @@ class AppController {
       spectators,
       this.currentRoomGolds,
       room.game_state ? room.game_state.is_sam_phase : false,
-      room.game_state ? room.game_state.sam_choices : {}
+      room.game_state ? room.game_state.sam_choices : {},
+      this.currentRoomNames,
+      this.currentRoomAvatars
     );
   }
 
@@ -704,7 +833,9 @@ class AppController {
       spectators,
       this.currentRoomGolds,
       msg.is_sam_phase,
-      msg.sam_choices
+      msg.sam_choices,
+      this.currentRoomNames,
+      this.currentRoomAvatars
     );
 
     // Render cards played in center
@@ -971,6 +1102,9 @@ class AppController {
   private handleLoginSuccess(session: UserSession) {
     this.currentUserId = session.user_id;
     this.currentUsername = session.username;
+    this.userDisplayName = session.display_name || '';
+    this.userAvatarUrl = session.avatar_url || '';
+    this.userGold = session.gold || 500000;
     this.wsClient.connect(session.user_id);
   }
 
@@ -1038,6 +1172,86 @@ class AppController {
   private showCreateRoomError(msg: string) {
     this.createRoomError.innerText = msg;
     this.createRoomError.classList.remove('hidden');
+  }
+
+  private showEditProfileModal() {
+    this.editProfileError.classList.add('hidden');
+    this.inputDisplayName.value = this.userDisplayName || this.currentUsername;
+    this.inputAvatarUrl.value = this.userAvatarUrl;
+
+    const presetGrid = document.getElementById('preset-avatars-grid')!;
+    presetGrid.innerHTML = '';
+    this.presetAvatars.forEach((url, index) => {
+      const btn = document.createElement('div');
+      btn.className = `w-8 h-8 rounded-full overflow-hidden border-2 cursor-pointer transition-all ${this.userAvatarUrl === url ? 'border-pink-500 scale-105' : 'border-transparent hover:border-pink-300'}`;
+      btn.innerHTML = `<img src="${url}" class="w-full h-full object-cover" />`;
+      btn.addEventListener('click', () => {
+        this.inputAvatarUrl.value = url;
+        presetGrid.querySelectorAll('div').forEach((d, i) => {
+          if (i === index) {
+            d.className = 'w-8 h-8 rounded-full overflow-hidden border-2 border-pink-500 scale-105 cursor-pointer transition-all';
+          } else {
+            d.className = 'w-8 h-8 rounded-full overflow-hidden border-2 border-transparent hover:border-pink-300 cursor-pointer transition-all';
+          }
+        });
+      });
+      presetGrid.appendChild(btn);
+    });
+
+    this.editProfileModal.classList.add('modal-show');
+    gsap.fromTo(this.editProfileCard,
+      { scale: 0.95, opacity: 0 },
+      { scale: 1, opacity: 1, duration: 0.2, ease: 'power2.out' }
+    );
+  }
+
+  private hideEditProfileModal() {
+    this.editProfileModal.classList.remove('modal-show');
+  }
+
+  private async handleEditProfileSubmit() {
+    const displayName = this.inputDisplayName.value.trim();
+    const avatarUrl = this.inputAvatarUrl.value.trim();
+
+    if (!displayName) {
+      this.editProfileError.innerText = 'Tên hiển thị không được bỏ trống!';
+      this.editProfileError.classList.remove('hidden');
+      return;
+    }
+
+    if (displayName.length > 20) {
+      this.editProfileError.innerText = 'Tên hiển thị không được vượt quá 20 ký tự!';
+      this.editProfileError.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      this.btnSubmitEditProfile.classList.add('pointer-events-none', 'opacity-75');
+      if (this.isServerOnline) {
+        this.wsClient.updateProfile(displayName, avatarUrl);
+      } else {
+        this.userDisplayName = displayName;
+        this.userAvatarUrl = avatarUrl;
+        
+        const userDisplay = document.getElementById('username-display')!;
+        userDisplay.innerText = displayName;
+        if (avatarUrl) {
+          this.userAvatarDisplay.src = avatarUrl;
+          this.userAvatarDisplay.classList.remove('hidden');
+          this.userAvatarFallback.classList.add('hidden');
+        } else {
+          this.userAvatarDisplay.classList.add('hidden');
+          this.userAvatarFallback.classList.remove('hidden');
+          this.userAvatarFallback.innerText = displayName.charAt(0).toUpperCase();
+        }
+      }
+      this.hideEditProfileModal();
+    } catch (err: any) {
+      this.editProfileError.innerText = err.message || 'Có lỗi xảy ra!';
+      this.editProfileError.classList.remove('hidden');
+    } finally {
+      this.btnSubmitEditProfile.classList.remove('pointer-events-none', 'opacity-75');
+    }
   }
 }
 
